@@ -41,7 +41,9 @@ export class PersonsService {
     return `This action updates a #${id} person`;
   }
 
-  remove(id: number) {
+  async remove(id: number) {
+
+    const person= await this.personRepository.delete(id)
     return `This action removes a #${id} person`;
   }
 
