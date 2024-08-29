@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, NotFoundException, Query } from '@nestjs/common';
 import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
+import { PaginationDto } from 'src/common/dtos/pagination.dto';
 
 @Controller('persons')
 export class PersonsController {
@@ -13,8 +14,9 @@ export class PersonsController {
   }
 
   @Get()
-  findAll() {
-    return this.personsService.findAll();
+  findAll(@Query() paginationDto: PaginationDto) {
+    console.log(paginationDto)
+    return this.personsService.findAll(paginationDto);
   }
 
   @Get(':id')

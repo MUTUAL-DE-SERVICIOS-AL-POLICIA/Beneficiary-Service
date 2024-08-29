@@ -4,6 +4,7 @@ import { UpdatePersonDto } from './dto/update-person.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Person } from './entities/person.entity';
+import { PaginationDto } from 'src/common/dtos/pagination.dto';
 
 @Injectable()
 export class PersonsService {
@@ -29,8 +30,13 @@ export class PersonsService {
     }
   }
 
-  findAll() {
-    return this.personRepository.find({})
+  findAll(paginationDto: PaginationDto) {
+
+    const{ limit = 10, offset = 0 } = paginationDto
+    return this.personRepository.find({
+      take: limit,
+      skip: offset
+    })
   }
 
   findOne(id: number) {
