@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -43,8 +43,22 @@ export class PersonsService {
     return this.personRepository.findOneBy({id});
   }
 
-  update(id: number, updatePersonDto: UpdatePersonDto) {
-    return `This action updates a #${id} person`;
+  async update(id: number, updatePersonDto: UpdatePersonDto) {
+
+    const person = await this.personRepository.preload({
+      id: id,
+      ...updatePersonDto
+    })
+
+    if (!person) throw new NotFoundException(`Person with: ${id} not found`);
+
+    try {
+      await this.personRepository.save( person);
+      return person
+    } catch (error) {
+      this.handleDBException(error)
+    }
+
   }
 
   async remove(id: number) {
