@@ -51,7 +51,7 @@ export class CreatePersonDto {
     reason_death?: string;
 
     @IsInt()
-    phone_number: number;
+    phone_number: string;
 
     @IsNumber()
     @IsOptional()
