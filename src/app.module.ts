@@ -3,7 +3,7 @@ import { PersonsModule } from './persons/persons.module';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommonModule } from './common/common.module';
-
+import { AffiliatesModule } from './affiliates/affiliates.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -18,7 +18,9 @@ import { CommonModule } from './common/common.module';
       synchronize: true
     }),
     PersonsModule,
-    CommonModule],
+    CommonModule,
+    AffiliatesModule,
+  ],
   controllers: [],
   providers: [],
 })
