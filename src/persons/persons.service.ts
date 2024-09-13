@@ -63,7 +63,7 @@ export class PersonsService {
 
   async remove(id: number) {
 
-    const person= await this.personRepository.delete(id)
+    const person= await this.personRepository.softDelete(id)
     return `This action removes a #${id} person`;
   }
 
