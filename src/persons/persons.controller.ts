@@ -2,7 +2,7 @@ import { Controller, ParseIntPipe, NotFoundException } from '@nestjs/common';
 import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { PaginationDto } from '../common/dtos/pagination.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('persons')
