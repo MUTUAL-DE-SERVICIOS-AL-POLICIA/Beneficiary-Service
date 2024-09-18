@@ -21,11 +21,7 @@ export class PersonsController {
 
   @MessagePattern('person.findOne')
   async findOne(@Payload('id', ParseIntPipe) id: number) {
-
-    const person = await this.personsService.findOne(id);
-    if (!person) throw new NotFoundException(`person with id ${id} no encontrado`);
-
-    return person;
+    return this.personsService.findOne(id);
   }
 
   @MessagePattern('person.update')

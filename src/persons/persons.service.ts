@@ -40,8 +40,12 @@ export class PersonsService {
     })
   }
 
-  findOne(id: number) {
-    return this.personRepository.findOneBy({id});
+  async findOne(id: number) {
+    const person = await this.personRepository.findOneBy({id});
+
+    if (!person) throw new NotFoundException(`Person with: ${id} not found`);
+    
+    return person;
   }
 
   async update(id: number, updatePersonDto: UpdatePersonDto) {
@@ -63,9 +67,13 @@ export class PersonsService {
   }
 
   async remove(id: number) {
-
-    const person= await this.personRepository.softDelete(id)
-    return `This action removes a #${id} person`;
+    const person = this.personRepository.findOneBy({id});
+    if (person) {
+      await this.personRepository.softDelete(id);
+      return `This action removes a #${id} person`;
+    } else {
+      throw new NotFoundException(`Person with: ${id} not found`);
+    }
   }
 
   private handleDBException( error:any ){
