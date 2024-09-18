@@ -119,7 +119,7 @@ describe('PersonsController', () => {
             await controller.create(personExample);
             await controller.create(personExample2);
 
-            const result = await controller.findAll({ limit: 10, offset: 0 });
+            const result = await controller.findAll({ limit: 10, page: 1 });
             expect(result.length).toBe(2);
         });
     });

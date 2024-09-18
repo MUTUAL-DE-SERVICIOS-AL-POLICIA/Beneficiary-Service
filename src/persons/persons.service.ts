@@ -32,7 +32,8 @@ export class PersonsService {
 
   findAll(paginationDto: PaginationDto) {
 
-    const{ limit = 10, offset = 0 } = paginationDto
+    const { limit, page } = paginationDto
+    const offset = (page - 1) * limit;
     return this.personRepository.find({
       take: limit,
       skip: offset
