@@ -30,14 +30,20 @@ export class PersonsService {
     }
   }
 
-  findAll(paginationDto: PaginationDto) {
+  async findAll(paginationDto: PaginationDto) {
 
     const { limit, page } = paginationDto
     const offset = (page - 1) * limit;
-    return this.personRepository.find({
+    const persons = await this.personRepository.find({
       take: limit,
       skip: offset
-    })
+    });
+    const total = await this.personRepository.count();
+
+    return {
+      persons,
+      total
+    }
   }
 
   async findOne(id: number) {
