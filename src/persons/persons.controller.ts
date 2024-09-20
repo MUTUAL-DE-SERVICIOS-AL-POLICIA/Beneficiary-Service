@@ -2,7 +2,7 @@ import { Controller, ParseIntPipe, NotFoundException } from '@nestjs/common';
 import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { PaginationDto } from '../common/dtos/pagination.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('persons')
@@ -21,11 +21,7 @@ export class PersonsController {
 
   @MessagePattern('person.findOne')
   async findOne(@Payload('id', ParseIntPipe) id: number) {
-
-    const person = await this.personsService.findOne(id);
-    if (!person) throw new NotFoundException(`person with id ${id} no encontrado`);
-
-    return person;
+    return this.personsService.findOne(id);
   }
 
   @MessagePattern('person.update')
