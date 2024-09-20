@@ -25,7 +25,7 @@ export class CreatePersonDto {
     due_date?: Date;
 
     @IsBoolean()
-    is_duedate_undefined?: boolean;
+    is_duedate_undefined: boolean;
 
     @IsString()
     @MaxLength(1)
@@ -44,13 +44,14 @@ export class CreatePersonDto {
     death_certificate?: Date;
 
     @IsString()
-    death_certificate_number: string;
+    @IsOptional()
+    death_certificate_number?: string;
 
     @IsString()
     @IsOptional()
     reason_death?: string;
 
-    @IsInt()
+    @IsString()
     phone_number: string;
 
     @IsNumber()

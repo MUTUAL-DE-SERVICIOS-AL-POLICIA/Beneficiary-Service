@@ -57,9 +57,7 @@ export class Person {
     })
     due_date: Date;
 
-    @Column('boolean',{
-        nullable: true
-    })
+    @Column('boolean',{ default: false })
     is_duedate_undefined: boolean;
 
     @Column('char',{ length:1 })
@@ -77,11 +75,6 @@ export class Person {
         nullable: true
     })
     date_death: Date
-
-    @Column('date',{
-        nullable: true
-    })
-    death_certificate: Date;
 
     @Column('text',{
         nullable: true

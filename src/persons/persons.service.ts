@@ -30,17 +30,28 @@ export class PersonsService {
     }
   }
 
-  findAll(paginationDto: PaginationDto) {
+  async findAll(paginationDto: PaginationDto) {
 
-    const{ limit = 10, offset = 0 } = paginationDto
-    return this.personRepository.find({
+    const { limit, page } = paginationDto
+    const offset = (page - 1) * limit;
+    const persons = await this.personRepository.find({
       take: limit,
       skip: offset
-    })
+    });
+    const total = await this.personRepository.count();
+
+    return {
+      persons,
+      total
+    }
   }
 
-  findOne(id: number) {
-    return this.personRepository.findOneBy({id});
+  async findOne(id: number) {
+    const person = await this.personRepository.findOneBy({id});
+
+    if (!person) throw new NotFoundException(`Person with: ${id} not found`);
+    
+    return person;
   }
 
   async update(id: number, updatePersonDto: UpdatePersonDto) {
@@ -62,9 +73,13 @@ export class PersonsService {
   }
 
   async remove(id: number) {
-
-    const person= await this.personRepository.delete(id)
-    return `This action removes a #${id} person`;
+    const person = this.personRepository.findOneBy({id});
+    if (person) {
+      await this.personRepository.softDelete(id);
+      return `This action removes a #${id} person`;
+    } else {
+      throw new NotFoundException(`Person with: ${id} not found`);
+    }
   }
 
   private handleDBException( error:any ){
