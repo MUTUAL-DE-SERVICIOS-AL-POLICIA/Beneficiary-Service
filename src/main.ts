@@ -7,15 +7,12 @@ import { envs } from './config';
 async function bootstrap() {
   const logger = new Logger('Main');
 
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AppModule,
-    {
-      transport: Transport.NATS,
-      options: {
-        servers: envs.natsServers,
-      },
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
+    transport: Transport.NATS,
+    options: {
+      servers: envs.natsServers,
     },
-  );
+  });
 
   //app.setGlobalPrefix('api');
 
