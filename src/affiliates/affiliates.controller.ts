@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { AffiliatesService } from './affiliates.service';
 import { CreateAffiliateDto } from './dto/create-affiliate.dto';
 import { UpdateAffiliateDto } from './dto/update-affiliate.dto';
@@ -15,7 +24,7 @@ export class AffiliatesController {
 
   @Get()
   findAll(@Query() paginationDto: PaginationDto) {
-    console.log(paginationDto)
+    console.log(paginationDto);
     return this.affiliatesService.findAll(paginationDto);
   }
   @Get(':id')
@@ -24,7 +33,10 @@ export class AffiliatesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAffiliateDto: UpdateAffiliateDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateAffiliateDto: UpdateAffiliateDto,
+  ) {
     return this.affiliatesService.update(+id, updateAffiliateDto);
   }
 

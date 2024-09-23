@@ -7,8 +7,6 @@ import { Affiliate } from './entities/affiliate.entity';
 @Module({
   controllers: [AffiliatesController],
   providers: [AffiliatesService],
-  imports: [
-    TypeOrmModule.forFeature([ Affiliate])
-  ]
+  imports: [TypeOrmModule.forFeature([Affiliate])],
 })
 export class AffiliatesModule {}

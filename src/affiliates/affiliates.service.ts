@@ -8,22 +8,22 @@ import { PaginationDto } from 'src/common/dtos/pagination.dto';
 
 @Injectable()
 export class AffiliatesService {
-
   constructor(
     @InjectRepository(Affiliate)
     private readonly affiliateRepository: Repository<Affiliate>,
-  ){}
+  ) {}
 
   create(createAffiliateDto: CreateAffiliateDto) {
     return 'This action adds a new affiliate';
   }
 
   findAll(paginationDto: PaginationDto) {
-    const{ limit = 10, offset = 0 } = paginationDto
+    const { limit = 10, page = 1 } = paginationDto;
+    const offset = (page - 1) * limit;
     return this.affiliateRepository.find({
       take: limit,
-      skip: offset
-    })
+      skip: offset,
+    });
   }
 
   findOne(id: number) {
