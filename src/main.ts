@@ -5,7 +5,6 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { envs } from './config';
 
 async function bootstrap() {
-  
   const logger = new Logger('Main');
 
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
@@ -13,9 +12,9 @@ async function bootstrap() {
     {
       transport: Transport.NATS,
       options: {
-        servers: envs.natsServers
-      }
-    }
+        servers: envs.natsServers,
+      },
+    },
   );
 
   //app.setGlobalPrefix('api');
@@ -24,10 +23,10 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-    })
-  )
+    }),
+  );
 
   await app.listen();
-  logger.log(`Persons Microservice running on port ${ envs.port }`);
+  logger.log(`Persons Microservice running on port ${envs.port}`);
 }
 bootstrap();
