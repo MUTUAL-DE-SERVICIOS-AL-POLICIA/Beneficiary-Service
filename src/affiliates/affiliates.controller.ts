@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { AffiliatesService } from './affiliates.service';
 import { CreateAffiliateDto } from './dto/create-affiliate.dto';
 import { UpdateAffiliateDto } from './dto/update-affiliate.dto';
@@ -33,10 +24,7 @@ export class AffiliatesController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateAffiliateDto: UpdateAffiliateDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateAffiliateDto: UpdateAffiliateDto) {
     return this.affiliatesService.update(+id, updateAffiliateDto);
   }
 
