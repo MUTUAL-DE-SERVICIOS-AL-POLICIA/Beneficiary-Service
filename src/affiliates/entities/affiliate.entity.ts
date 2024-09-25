@@ -1,3 +1,4 @@
+import { AffiliateDocument } from 'src/affiliate-documents/entities/affiliate-document.entity';
 import {
   Column,
   CreateDateColumn,
@@ -5,6 +6,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliates' })
@@ -56,4 +58,7 @@ export class Affiliate {
 
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
+
+  @OneToMany(() => AffiliateDocument, (affiliate_documents) => affiliate_documents.affiliate)
+  affiliate_documents: AffiliateDocument[];
 }
