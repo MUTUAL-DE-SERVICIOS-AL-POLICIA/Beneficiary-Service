@@ -1,3 +1,1 @@
-
-export class PersonAffiliate {
-}
+export class PersonAffiliate {}
