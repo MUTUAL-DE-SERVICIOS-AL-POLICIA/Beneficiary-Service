@@ -10,7 +10,7 @@ import { UpdatePersonDto } from './dto/update-person.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Person } from './entities/person.entity';
-import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { FilteredPaginationDto } from './dto/filter-person.dto';
 
 @Injectable()
 export class PersonsService {
@@ -30,15 +30,28 @@ export class PersonsService {
     }
   }
 
-  async findAll(paginationDto: PaginationDto) {
-    const { limit = 10, page = 1 } = paginationDto;
+  async findAll(filteredPaginationDto: FilteredPaginationDto) {
+    const { limit = 10, page = 1, filter } = filteredPaginationDto;
     const offset = (page - 1) * limit;
-    const persons = await this.personRepository.find({
-      take: limit,
-      skip: offset,
-    });
-    const total = await this.personRepository.count();
-
+    const query = this.personRepository.createQueryBuilder('person');
+    if (filter) {
+      const formattedFilter = filter.replace(/\s+/g, '').trim();
+      query.andWhere(
+        ` person.identity_card ILIKE :filter OR
+          LOWER(CONCAT(
+              person.first_name,
+              COALESCE(person.second_name, ''),
+              person.last_name,
+              COALESCE(person.mothers_last_name, '')
+          )) LIKE :filter
+        `,
+        {
+          filter: `%${formattedFilter}%`,
+        },
+      );
+    }
+    query.skip(offset).take(limit);
+    const [persons, total] = await query.getManyAndCount();
     return {
       persons,
       total,
