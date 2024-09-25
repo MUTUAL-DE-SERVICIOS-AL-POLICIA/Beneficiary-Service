@@ -1,9 +1,9 @@
-import { Controller, ParseIntPipe, NotFoundException } from '@nestjs/common';
+import { Controller, ParseIntPipe } from '@nestjs/common';
 import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { PaginationDto } from '../common/dtos/pagination.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { FilteredPaginationDto } from './dto/filter-person.dto';
 
 @Controller('persons')
 export class PersonsController {
@@ -15,8 +15,9 @@ export class PersonsController {
   }
 
   @MessagePattern('person.findAll')
-  findAll(@Payload() paginationDto: PaginationDto) {
-    return this.personsService.findAll(paginationDto);
+  findAll(@Payload() filteredPaginationDto: FilteredPaginationDto) {
+    console.log(FilteredPaginationDto);
+    return this.personsService.findAll(filteredPaginationDto);
   }
 
   @MessagePattern('person.findOne')
