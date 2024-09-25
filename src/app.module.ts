@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommonModule } from './common/common.module';
 import { AffiliatesModule } from './affiliates/affiliates.module';
 import { PersonAffiliateModule } from './person_affiliate/person_affiliate.module';
+import { AffiliateDocumentsModule } from './affiliate-documents/affiliate-documents.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -21,6 +22,7 @@ import { PersonAffiliateModule } from './person_affiliate/person_affiliate.modul
     PersonsModule,
     CommonModule,
     AffiliatesModule,
+    AffiliateDocumentsModule,
     // PersonAffiliateModule,
   ],
   controllers: [],
