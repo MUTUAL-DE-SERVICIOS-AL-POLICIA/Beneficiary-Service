@@ -1,4 +1,4 @@
-import { AffiliateDocument } from 'src/affiliate-documents/entities/affiliate-document.entity';
+import { AffiliateDocument } from 'src/affiliates/entities/affiliate-document.entity';
 import {
   Column,
   CreateDateColumn,
