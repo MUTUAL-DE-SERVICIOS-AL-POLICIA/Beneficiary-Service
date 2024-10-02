@@ -22,6 +22,9 @@ export class AffiliateDocument {
   @Column()
   procedure_document_id: number;
 
+  @Column()
+  path: string;
+
   @CreateDateColumn()
   created_at: Date;
 
