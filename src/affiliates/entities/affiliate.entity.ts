@@ -1,4 +1,4 @@
-import { AffiliateDocument } from 'src/affiliates/entities/affiliate-document.entity';
+import { PersonAffiliate } from 'src/person_affiliate/entities/person_affiliate.entity';
 import {
   Column,
   CreateDateColumn,
@@ -8,11 +8,15 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
+import { AffiliateDocument } from './affiliate-document.entity';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliates' })
 export class Affiliate {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column('int', { nullable: true })
+  affiliate_state_id: number;
 
   @Column('int', { nullable: true })
   degree_id: number;
@@ -22,9 +26,6 @@ export class Affiliate {
 
   @Column('int', { nullable: true })
   category_id: number;
-
-  @Column('int', { nullable: true })
-  affiliate_state_id: number;
 
   @Column('text', { nullable: true })
   registration: string;
@@ -50,6 +51,18 @@ export class Affiliate {
   @Column('text', { nullable: true })
   unit_police_description: string;
 
+  @Column('text', { nullable: true })
+  official: string;
+
+  @Column('text', { nullable: true })
+  book: string;
+
+  @Column('text', { nullable: true })
+  departure: string;
+
+  @Column('date', { nullable: true })
+  marriage_date: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
@@ -61,4 +74,7 @@ export class Affiliate {
 
   @OneToMany(() => AffiliateDocument, (affiliate_documents) => affiliate_documents.affiliate)
   affiliate_documents: AffiliateDocument[];
+
+  @OneToMany(() => PersonAffiliate, (person_affiliate) => person_affiliate.type_id)
+  person_affiliate: PersonAffiliate[];
 }
