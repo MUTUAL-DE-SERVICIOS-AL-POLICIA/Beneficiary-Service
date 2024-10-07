@@ -1,10 +1,11 @@
-import { IsString } from 'class-validator';
+import { PersonAffiliate } from 'src/person_affiliate/entities/person_affiliate.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
   Generated,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -67,7 +68,7 @@ export class Person {
   @Column('boolean', { default: false })
   is_duedate_undefined: boolean;
 
-  @Column('char', { length: 1 })
+  @Column('char', { length: 1, nullable: true })
   gender: string;
 
   @Column('char', { length: 1, nullable: true })
@@ -123,6 +124,9 @@ export class Person {
   })
   id_person_senasir: number;
 
+  @OneToMany(() => PersonAffiliate, (personAffiliate) => personAffiliate.person)
+  personAffiliates: PersonAffiliate[];
+
   @Column('date', {
     nullable: true,
   })
@@ -136,4 +140,7 @@ export class Person {
 
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
+
+  @OneToMany(() => PersonAffiliate, (person_affiliate) => person_affiliate.type_id)
+  person_affiliate: PersonAffiliate[];
 }

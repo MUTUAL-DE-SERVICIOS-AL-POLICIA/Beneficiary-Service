@@ -21,7 +21,7 @@ import { PersonAffiliateModule } from './person_affiliate/person_affiliate.modul
     PersonsModule,
     CommonModule,
     AffiliatesModule,
-    // PersonAffiliateModule,
+    PersonAffiliateModule,
   ],
   controllers: [],
   providers: [],
