@@ -1,15 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Delete } from '@nestjs/common';
 import { PersonAffiliateService } from './person_affiliate.service';
-import { CreatePersonAffiliateDto } from './dto/create-person_affiliate.dto';
-import { UpdatePersonAffiliateDto } from './dto/update-person_affiliate.dto';
 
 @Controller('person-affiliate')
 export class PersonAffiliateController {
   constructor(private readonly personAffiliateService: PersonAffiliateService) {}
 
   @Post()
-  create(@Body() createPersonAffiliateDto: CreatePersonAffiliateDto) {
-    return this.personAffiliateService.create(createPersonAffiliateDto);
+  create() {
+    return this.personAffiliateService.create();
   }
 
   @Get()
@@ -23,8 +21,8 @@ export class PersonAffiliateController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePersonAffiliateDto: UpdatePersonAffiliateDto) {
-    return this.personAffiliateService.update(+id, updatePersonAffiliateDto);
+  update() {
+    // return this.personAffiliateService.update();
   }
 
   @Delete(':id')

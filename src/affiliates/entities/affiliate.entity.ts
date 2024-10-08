@@ -1,4 +1,4 @@
-import { PersonAffiliate } from 'src/person_affiliate/entities/person_affiliate.entity';
+import { PersonAffiliate } from 'src/persons/entities/person_affiliate.entity';
 import {
   Column,
   CreateDateColumn,
