@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateAffiliateDto } from './dto/create-affiliate.dto';
 import { UpdateAffiliateDto } from './dto/update-affiliate.dto';
 import { Affiliate } from './entities/affiliate.entity';
@@ -26,8 +26,11 @@ export class AffiliatesService {
     });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} affiliate`;
+  async findOne(id: number) {
+    const affliate = await this.affiliateRepository.findOneBy({ id });
+
+    if (!affliate) throw new NotFoundException(`Affiliate with: ${id} not found`);
+    return affliate;
   }
 
   update(id: number, updateAffiliateDto: UpdateAffiliateDto) {
