@@ -140,7 +140,4 @@ export class Person {
 
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
-
-  @OneToMany(() => PersonAffiliate, (person_affiliate) => person_affiliate.type_id)
-  person_affiliate: PersonAffiliate[];
 }

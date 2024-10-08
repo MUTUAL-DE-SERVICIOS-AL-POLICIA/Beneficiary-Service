@@ -59,11 +59,19 @@ export class PersonsService {
   }
 
   async findOne(id: number) {
-    const person = await this.personRepository.findOneBy({ id });
-
+    const person = await this.personRepository.findOne({
+      where: { id: id },
+      relations: ['personAffiliates'],
+    });
     if (!person) throw new NotFoundException(`Person with: ${id} not found`);
-
-    return person;
+    const isAffiliate = person.personAffiliates.some(
+      (affiliate) => affiliate.type === 'affiliates',
+    );
+    return {
+      ...person,
+      isAffiliate,
+      personAffiliates: undefined,
+    };
   }
 
   async update(id: number, updatePersonDto: UpdatePersonDto) {
