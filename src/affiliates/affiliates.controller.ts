@@ -1,8 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { AffiliatesService } from './affiliates.service';
 import { CreateAffiliateDto } from './dto/create-affiliate.dto';
 import { UpdateAffiliateDto } from './dto/update-affiliate.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('affiliates')
 export class AffiliatesController {
@@ -18,8 +29,8 @@ export class AffiliatesController {
     console.log(paginationDto);
     return this.affiliatesService.findAll(paginationDto);
   }
-  @Get(':id')
-  findOne(@Param('id') id: string) {
+  @MessagePattern('affiliate.findOne')
+  findOne(@Payload('id', ParseIntPipe) id: number) {
     return this.affiliatesService.findOne(+id);
   }
 
