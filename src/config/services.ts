@@ -1,3 +1,1 @@
 export const PERSON_SERVICE = 'PERSON_SERVICE';
-
-export const NATS_SERVICE = 'NATS_SERVICE';

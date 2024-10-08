@@ -8,7 +8,7 @@ import {
   JoinColumn,
   Column,
 } from 'typeorm';
-import { Affiliate } from './';
+import { Affiliate } from '../../affiliates/entities/affiliate.entity';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliate_documents' })
 export class AffiliateDocument {
