@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommonModule } from './common/common.module';
 import { AffiliatesModule } from './affiliates/affiliates.module';
-import { PersonAffiliateModule } from './person_affiliate/person_affiliate.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -21,7 +21,6 @@ import { PersonAffiliateModule } from './person_affiliate/person_affiliate.modul
     PersonsModule,
     CommonModule,
     AffiliatesModule,
-    PersonAffiliateModule,
   ],
   controllers: [],
   providers: [],
