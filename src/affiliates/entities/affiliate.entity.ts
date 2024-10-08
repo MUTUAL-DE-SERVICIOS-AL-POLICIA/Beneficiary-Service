@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { AffiliateDocument } from './affiliate-document.entity';
+import { AffiliateDocument } from './';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliates' })
 export class Affiliate {

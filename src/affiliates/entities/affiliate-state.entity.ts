@@ -1,5 +1,5 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { stateType } from './state-type.entity';
+import { stateType } from './';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliate_states' })
 export class AffiliateState {
