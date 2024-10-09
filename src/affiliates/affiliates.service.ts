@@ -43,6 +43,18 @@ export class AffiliatesService {
   remove(id: number) {
     return `This action removes a #${id} affiliate`;
   }
+
+  async showDocuments(id: number): Promise<Affiliate | null> {
+    try {
+      const affiliate = await this.findAndVerifyAffiliateWithRelations(id,['affiliateDocuments']);
+      return affiliate;
+    } catch (error) {
+      throw new RpcException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Check logs',
+      });
+    }
+  }
   
   private async findAndVerifyAffiliateWithRelations(id: number, relations: string[] = []): Promise<Affiliate | null> {
     const affiliate = await this.affiliateRepository.findOne({
