@@ -9,7 +9,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Person } from './entities/person.entity';
+import { Person } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 
 @Injectable()
