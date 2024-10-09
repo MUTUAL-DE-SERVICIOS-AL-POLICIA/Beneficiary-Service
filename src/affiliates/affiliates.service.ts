@@ -1,15 +1,25 @@
-import { HttpStatus, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateAffiliateDto } from './dto/create-affiliate.dto';
 import { UpdateAffiliateDto } from './dto/update-affiliate.dto';
-import { Affiliate } from './entities/affiliate.entity';
+import { Affiliate } from './entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { NATS_SERVICE } from 'src/config';
-import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class AffiliatesService {
+  private readonly logger = new Logger('AffiliateDocumentsService');
+
   constructor(
     @InjectRepository(Affiliate)
     private readonly affiliateRepository: Repository<Affiliate>,
@@ -56,7 +66,10 @@ export class AffiliatesService {
     }
   }
   
-  private async findAndVerifyAffiliateWithRelations(id: number, relations: string[] = []): Promise<Affiliate | null> {
+  private async findAndVerifyAffiliateWithRelations(
+    id: number,
+    relations: string[] = [],
+  ): Promise<Affiliate | null> {
     const affiliate = await this.affiliateRepository.findOne({
       where: { id },
       relations: relations.length > 0 ? relations : [],
@@ -65,5 +78,11 @@ export class AffiliatesService {
       throw new NotFoundException(`Affiliate with ID: ${id} not found`);
     }
     return affiliate;
+  }
+
+  private handleDBException(error: any) {
+    if (error.code === '23505') throw new BadRequestException(error.detail);
+    this.logger.error(error);
+    throw new InternalServerErrorException('Unexecpected Error');
   }
 }
