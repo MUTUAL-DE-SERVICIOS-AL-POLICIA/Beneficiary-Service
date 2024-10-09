@@ -44,7 +44,7 @@ export class AffiliatesController {
     return this.affiliatesService.remove(+id);
   }
 
-  @MessagePattern('affiliateDocuments.showDocuments')
+  @MessagePattern('affiliate.showDocuments')
   showDocuments(@Payload('id', ParseIntPipe) affiliate_id: number) {
     return this.affiliatesService.showDocuments(affiliate_id);
   }
