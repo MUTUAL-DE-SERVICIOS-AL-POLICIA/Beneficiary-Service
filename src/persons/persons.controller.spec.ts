@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PersonsController } from './persons.controller';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
-import { Person } from './entities/person.entity';
+import { Person } from './entities';
 import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CreatePersonDto } from './dto/create-person.dto';
