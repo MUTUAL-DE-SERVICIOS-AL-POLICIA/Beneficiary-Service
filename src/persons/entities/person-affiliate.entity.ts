@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
 } from 'typeorm';
-import { Person } from 'src/persons/entities/person.entity';
+import { Person } from './';
 @Entity({ schema: 'beneficiaries', name: 'person_affiliates' })
 export class PersonAffiliate {
   @PrimaryGeneratedColumn()
