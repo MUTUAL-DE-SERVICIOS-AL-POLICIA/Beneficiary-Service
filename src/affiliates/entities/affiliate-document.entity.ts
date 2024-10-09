@@ -15,7 +15,7 @@ export class AffiliateDocument {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
 
-  @ManyToOne(() => Affiliate, (affiliate) => affiliate.affiliate_documents)
+  @ManyToOne(() => Affiliate, (affiliate) => affiliate.affiliateDocuments)
   @JoinColumn({ name: 'affiliate_id' })
   affiliate: Affiliate;
 

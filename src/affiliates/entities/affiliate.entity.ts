@@ -72,8 +72,8 @@ export class Affiliate {
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
 
-  @OneToMany(() => AffiliateDocument, (affiliate_documents) => affiliate_documents.affiliate)
-  affiliate_documents: AffiliateDocument[];
+  @OneToMany(() => AffiliateDocument, (affiliateDocuments) => affiliateDocuments.affiliate)
+  affiliateDocuments: AffiliateDocument[];
 
   @OneToMany(() => PersonAffiliate, (person_affiliate) => person_affiliate.type_id)
   person_affiliate: PersonAffiliate[];
