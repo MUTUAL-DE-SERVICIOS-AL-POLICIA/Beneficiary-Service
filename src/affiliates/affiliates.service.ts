@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateAffiliateDto } from './dto/create-affiliate.dto';
 import { UpdateAffiliateDto } from './dto/update-affiliate.dto';
 import { Affiliate } from './entities/affiliate.entity';
@@ -6,7 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { NATS_SERVICE } from 'src/config';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class AffiliatesService {
@@ -30,10 +30,10 @@ export class AffiliatesService {
   }
 
   async findOne(id: number) {
-    const affliate = await this.affiliateRepository.findOneBy({ id });
+    const affiliate = await this.affiliateRepository.findOneBy({ id });
 
-    if (!affliate) throw new NotFoundException(`Affiliate with: ${id} not found`);
-    return affliate;
+    if (!affiliate) throw new NotFoundException(`Affiliate with: ${id} not found`);
+    return affiliate;
   }
 
   update(id: number, updateAffiliateDto: UpdateAffiliateDto) {
@@ -42,5 +42,16 @@ export class AffiliatesService {
 
   remove(id: number) {
     return `This action removes a #${id} affiliate`;
+  }
+  
+  private async findAndVerifyAffiliateWithRelations(id: number, relations: string[] = []): Promise<Affiliate | null> {
+    const affiliate = await this.affiliateRepository.findOne({
+      where: { id },
+      relations: relations.length > 0 ? relations : [],
+    });
+    if (!affiliate) {
+      throw new NotFoundException(`Affiliate with ID: ${id} not found`);
+    }
+    return affiliate;
   }
 }
