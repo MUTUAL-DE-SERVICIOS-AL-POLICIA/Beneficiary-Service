@@ -54,18 +54,34 @@ export class AffiliatesService {
     return `This action removes a #${id} affiliate`;
   }
 
-  async showDocuments(id: number): Promise<Affiliate | null> {
+  async showDocuments(id: number): Promise<any> {
     try {
-      const affiliate = await this.findAndVerifyAffiliateWithRelations(id,['affiliateDocuments']);
-      return affiliate;
-    } catch (error) {
-      throw new RpcException({
-        status: HttpStatus.BAD_REQUEST,
-        message: 'Check logs',
+      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, ['affiliateDocuments']);
+      const affiliateDocuments = affiliate.affiliateDocuments;
+
+      if (affiliateDocuments.length === 0) return affiliateDocuments;
+
+      const procedureDocumentIds = affiliateDocuments.map((doc) => doc.procedure_document_id);
+
+      const documentNames = await firstValueFrom(
+        this.client.send('procedureDocuments.findAllByIds', { ids: procedureDocumentIds }),
+      );
+
+      const mappedDocuments = affiliateDocuments.map((doc) => {
+        const name = documentNames[doc.procedure_document_id] || 'Unknown Document';
+        return {
+          ...doc,
+          name,
+        };
       });
+
+      return mappedDocuments;
+    } catch (error) {
+      //return [];
+      this.handleDBException(error);
     }
   }
-  
+
   private async findAndVerifyAffiliateWithRelations(
     id: number,
     relations: string[] = [],
