@@ -34,4 +34,9 @@ export class PersonsController {
   remove(@Payload('id', ParseIntPipe) id: number) {
     return this.personsService.remove(id);
   }
+
+  @MessagePattern('person.findPersonAffiliatesWithDetails')
+  async findPersonAffiliatesWithDetails(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.findPersonAffiliatesWithDetails(id);
+  }
 }
