@@ -99,6 +99,23 @@ export class PersonsService {
       throw new NotFoundException(`Person with: ${id} not found`);
     }
   }
+
+  async findPersonAffiliatesWithDetails(id: number): Promise<any> {
+    const person = await this.findAndVerifyPersonWithRelations(
+      id,
+      'personAffiliates',
+      'affiliates',
+      'type',
+    );
+    const personDetails = await this.personRepository.findOne({
+      where: { id },
+    });
+    return {
+      ...personDetails,
+      relations: person,
+    };
+  }
+
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
@@ -119,7 +136,7 @@ export class PersonsService {
       throw new NotFoundException(`Affiliate with ID: ${id} not found`);
     }
     const relatedData = person[relation];
-    const found = relatedData.filter((item) => item[field] === registration);
+    const found = relatedData.filter(item => item[field] === registration);
     return found.length > 0 ? found : [];
   }
 }
