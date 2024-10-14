@@ -9,6 +9,11 @@ interface EnvVars {
   DB_TEST_HOST: string;
   DB_TEST_PORT: number;
   DB_TEST_USERNAME: string;
+  FTP_HOST: string;
+  FTP_USERNAME: string;
+  FTP_PASSWORD: string;
+  FTP_ROOT: string;
+  FTP_SSL: boolean;
 }
 
 const envsSchema = joi
@@ -37,4 +42,12 @@ export const envs = {
   dbTestHost: envVars.DB_TEST_HOST,
   dbTestPort: envVars.DB_TEST_PORT,
   dbTestUsername: envVars.DB_TEST_USERNAME,
+};
+
+export const envsFtp = {
+  ftpHost: envVars.FTP_HOST,
+  ftpUsername: envVars.FTP_USERNAME,
+  ftpPassword: envVars.FTP_PASSWORD,
+  ftpRoot: envVars.FTP_ROOT,
+  ftpSsl: envVars.FTP_SSL,
 };
