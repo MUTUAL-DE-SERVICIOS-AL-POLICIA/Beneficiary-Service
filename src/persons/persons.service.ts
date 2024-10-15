@@ -107,13 +107,7 @@ export class PersonsService {
       'affiliates',
       'type',
     );
-    const personDetails = await this.personRepository.findOne({
-      where: { id },
-    });
-    return {
-      ...personDetails,
-      relations: person,
-    };
+    return person;
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
@@ -123,19 +117,7 @@ export class PersonsService {
       'persons',
       'type',
     );
-    if (personAffiliates.length > 0) {
-      const relatedPersonId = personAffiliates[0].type_id;
-      const relatedPerson = await this.personRepository.findOne({
-        where: { id: relatedPersonId },
-      });
-
-      if (!relatedPerson) {
-        throw new NotFoundException(`Person with ID: ${relatedPersonId} not found`);
-      }
-
-      return relatedPerson;
-    }
-    return { message: 'No affiliates found related to the person.' };
+    return personAffiliates;
   }
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
@@ -156,8 +138,15 @@ export class PersonsService {
     if (!person) {
       throw new NotFoundException(`Affiliate with ID: ${id} not found`);
     }
-    const relatedData = person[relation];
-    const found = relatedData.filter(item => item[field] === registration);
-    return found.length > 0 ? found : [];
+    if (!person[relation]) {
+      throw new Error(`campo ${relation} no existe en person`);
+    }
+    const filteredRelatedData = person[relation].filter(
+      (related) => related[field] === registration,
+    );
+    return {
+      ...person,
+      personAffiliates: filteredRelatedData,
+    };
   }
 }
