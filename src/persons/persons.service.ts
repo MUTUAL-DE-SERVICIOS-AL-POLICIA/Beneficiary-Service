@@ -107,13 +107,7 @@ export class PersonsService {
       'affiliates',
       'type',
     );
-    const personDetails = await this.personRepository.findOne({
-      where: { id },
-    });
-    return {
-      ...personDetails,
-      relations: person,
-    };
+    return person;
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
