@@ -156,8 +156,15 @@ export class PersonsService {
     if (!person) {
       throw new NotFoundException(`Affiliate with ID: ${id} not found`);
     }
-    const relatedData = person[relation];
-    const found = relatedData.filter(item => item[field] === registration);
-    return found.length > 0 ? found : [];
+    if (!person[relation]) {
+      throw new Error(`campo ${relation} no existe en person`);
+    }
+    const filteredRelatedData = person[relation].filter(
+      (related) => related[field] === registration,
+    );
+    return {
+      ...person,
+      personAffiliates: filteredRelatedData,
+    };
   }
 }
