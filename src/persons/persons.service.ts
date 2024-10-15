@@ -117,19 +117,7 @@ export class PersonsService {
       'persons',
       'type',
     );
-    if (personAffiliates.length > 0) {
-      const relatedPersonId = personAffiliates[0].type_id;
-      const relatedPerson = await this.personRepository.findOne({
-        where: { id: relatedPersonId },
-      });
-
-      if (!relatedPerson) {
-        throw new NotFoundException(`Person with ID: ${relatedPersonId} not found`);
-      }
-
-      return relatedPerson;
-    }
-    return { message: 'No affiliates found related to the person.' };
+    return personAffiliates;
   }
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
