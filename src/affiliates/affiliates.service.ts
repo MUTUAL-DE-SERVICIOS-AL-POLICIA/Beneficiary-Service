@@ -139,6 +139,26 @@ export class AffiliatesService {
     return affiliate;
   }
 
+  private async findAndVerifyAffiliateWithRelationOneCondition(
+    id: number,
+    relation: string,
+    column: string,
+    data: any,
+  ): Promise<Affiliate | null> {
+    const affiliate = await this.affiliateRepository
+      .createQueryBuilder('affiliate')
+      .leftJoinAndSelect(`affiliate.${relation}`, 'relation', `relation.${column} = :data`, {
+        data,
+      })
+      .where('affiliate.id = :id', { id })
+      .getOne();
+
+    if (!affiliate) {
+      throw new NotFoundException(`Affiliate not found with ID ${id}`);
+    }
+    return affiliate;
+  }
+
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
