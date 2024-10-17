@@ -24,4 +24,16 @@ export class FtpService {
       console.error('Failed to connect to FTP server:', error);
     }
   }
+
+  async uploadFile(document: Buffer, verifyPath: string, Path: string) {
+    try {
+      const buffer = Buffer.from(document.buffer);
+      const documentStream = Readable.from(buffer);
+      await this.client.ensureDir(verifyPath);
+      await this.client.uploadFrom(documentStream, Path);
+      console.log('Uploaded file successfully');
+    } catch (error) {
+      console.error('Failed to upload file:', error);
+    }
+  }
 }
