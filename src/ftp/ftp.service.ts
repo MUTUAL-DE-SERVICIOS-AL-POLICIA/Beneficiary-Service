@@ -10,4 +10,18 @@ export class FtpService {
   constructor() {
     this.client = new ftp.Client();
   }
+
+  async connectToFtp() {
+    try {
+      await this.client.access({
+        host: envsFtp.ftpHost,
+        user: envsFtp.ftpUsername,
+        password: envsFtp.ftpPassword,
+        secure: envsFtp.ftpSsl,
+      });
+      console.log('Connected to FTP server successfully');
+    } catch (error) {
+      console.error('Failed to connect to FTP server:', error);
+    }
+  }
 }
