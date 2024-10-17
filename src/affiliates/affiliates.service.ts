@@ -125,6 +125,34 @@ export class AffiliatesService {
     }
   }
 
+  async findDocument(affiliate_id: number, procedure_document_id: number): Promise<Buffer> {
+    try {
+      const relation = 'affiliateDocuments';
+      const column = 'procedure_document_id';
+      const data = procedure_document_id;
+
+      const [affiliate] = await Promise.all([
+        this.findAndVerifyAffiliateWithRelationOneCondition(affiliate_id, relation, column, data),
+        this.ftpService.connectToFtp(),
+      ]);
+
+      const documents = affiliate.affiliateDocuments;
+
+      if (documents.length === 0) throw new NotFoundException('Document not found');
+
+      const firstDocument = documents[0];
+
+      const documentDownload = await this.ftpService.downloadFile(firstDocument.path);
+
+      return documentDownload;
+    } catch (error) {
+      this.handleDBException(error);
+      throw error;
+    } finally {
+      this.ftpService.onDestroy();
+    }
+  }
+
   private async findAndVerifyAffiliateWithRelations(
     id: number,
     relations: string[] = [],
