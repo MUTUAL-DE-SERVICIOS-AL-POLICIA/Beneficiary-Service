@@ -57,4 +57,12 @@ export class AffiliatesController {
   showDocuments(@Payload('id', ParseIntPipe) affiliate_id: number) {
     return this.affiliatesService.showDocuments(affiliate_id);
   }
+
+  @MessagePattern('affiliate.findDocument')
+  findDocument(
+    @Payload('affiliate_id', ParseIntPipe) affiliate_id: number,
+    @Payload('procedure_document_id', ParseIntPipe) procedure_document_id: number,
+  ) {
+    return this.affiliatesService.findDocument(affiliate_id, procedure_document_id);
+  }
 }
