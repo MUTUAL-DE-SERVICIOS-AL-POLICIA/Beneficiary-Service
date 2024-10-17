@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -11,6 +12,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Person } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
+import { ClientProxy } from '@nestjs/microservices';
+import { NATS_SERVICE } from 'src/config';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class PersonsService {
@@ -19,6 +23,7 @@ export class PersonsService {
   constructor(
     @InjectRepository(Person)
     private readonly personRepository: Repository<Person>,
+    @Inject(NATS_SERVICE) private readonly client: ClientProxy,
   ) {}
   async create(createPersonDto: CreatePersonDto) {
     try {
@@ -100,14 +105,31 @@ export class PersonsService {
     }
   }
 
-  async findPersonAffiliatesWithDetails(id: number): Promise<any> {
-    const person = await this.findAndVerifyPersonWithRelations(
-      id,
-      'personAffiliates',
-      'affiliates',
-      'type',
-    );
-    return person;
+  async findPersonAffiliatesWithDetails(id: number): Promise<Person> {
+    try {
+      const person = await this.findAndVerifyPersonWithRelations(
+        id,
+        'personAffiliates',
+        'affiliates',
+        'type',
+      );
+      const mappedPerson = {
+        ...person,
+        city_birth_name: await this.VerifyIdAndGetNameMatched(person.city_birth_id, 'cities'),
+        pension_entity_name: await this.VerifyIdAndGetNameMatched(
+          person.pension_entity_id,
+          'pensionEntities',
+        ),
+        financial_entity: await this.VerifyIdAndGetNameMatched(
+          person.financial_entity_id,
+          'financialEntities',
+        ),
+      };
+      return mappedPerson;
+    } catch (error) {
+      this.handleDBException(error);
+      throw new Error('Error retrieving person data');
+    }
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
@@ -148,5 +170,12 @@ export class PersonsService {
       ...person,
       personAffiliates: filteredRelatedData,
     };
+  }
+  private async VerifyIdAndGetNameMatched(id: number | null, service: string): Promise<any | null> {
+    if (id) {
+      const entity = await firstValueFrom(this.client.send(`${service}.findOne`, { id: id }));
+      return entity.name;
+    }
+    return null;
   }
 }
