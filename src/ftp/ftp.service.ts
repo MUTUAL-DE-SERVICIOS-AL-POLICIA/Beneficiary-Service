@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { envsFtp } from 'src/config';
 import * as ftp from 'basic-ftp';
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 
 @Injectable()
 export class FtpService {
+  private readonly logger = new Logger('FtpService');
   private client: ftp.Client;
 
   constructor() {
@@ -19,9 +20,9 @@ export class FtpService {
         password: envsFtp.ftpPassword,
         secure: envsFtp.ftpSsl,
       });
-      console.log('Connected to FTP server successfully');
+      this.logger.log('Connected to FTP server successfully');
     } catch (error) {
-      console.error('Failed to connect to FTP server:', error);
+      this.logger.error('Failed to connect to FTP server:', error);
     }
   }
 
@@ -31,13 +32,32 @@ export class FtpService {
       const documentStream = Readable.from(buffer);
       await this.client.ensureDir(verifyPath);
       await this.client.uploadFrom(documentStream, Path);
-      console.log('Uploaded file successfully');
+      this.logger.log('Uploaded file successfully');
     } catch (error) {
-      console.error('Failed to upload file:', error);
+      this.logger.error('Failed to upload file:', error);
+    }
+  }
+
+  async downloadFile(path: string) {
+    try {
+      const remoteFilePath = `${envsFtp.ftpRoot}${path}`;
+      const chunks: Buffer[] = [];
+      const writableStream = new Writable({
+        write(chunk, encoding, callback) {
+          chunks.push(Buffer.from(chunk));
+          callback();
+        },
+      });
+      await this.client.downloadTo(writableStream, remoteFilePath);
+      this.logger.log('Downloaded file successfully');
+      return Buffer.concat(chunks);
+    } catch (error) {
+      this.logger.error('Failed to download file:', error);
     }
   }
 
   async onDestroy() {
-    this.client.close();
+    await this.client.close();
+    this.logger.log('FTP connection closed');
   }
 }
