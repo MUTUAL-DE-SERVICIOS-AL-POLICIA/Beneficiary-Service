@@ -125,6 +125,34 @@ export class AffiliatesService {
     }
   }
 
+  async findDocument(affiliate_id: number, procedure_document_id: number): Promise<Buffer> {
+    try {
+      const relation = 'affiliateDocuments';
+      const column = 'procedure_document_id';
+      const data = procedure_document_id;
+
+      const [affiliate] = await Promise.all([
+        this.findAndVerifyAffiliateWithRelationOneCondition(affiliate_id, relation, column, data),
+        this.ftpService.connectToFtp(),
+      ]);
+
+      const documents = affiliate.affiliateDocuments;
+
+      if (documents.length === 0) throw new NotFoundException('Document not found');
+
+      const firstDocument = documents[0];
+
+      const documentDownload = await this.ftpService.downloadFile(firstDocument.path);
+
+      return documentDownload;
+    } catch (error) {
+      this.handleDBException(error);
+      throw error;
+    } finally {
+      this.ftpService.onDestroy();
+    }
+  }
+
   private async findAndVerifyAffiliateWithRelations(
     id: number,
     relations: string[] = [],
@@ -135,6 +163,26 @@ export class AffiliatesService {
     });
     if (!affiliate) {
       throw new NotFoundException(`Affiliate with ID: ${id} not found`);
+    }
+    return affiliate;
+  }
+
+  private async findAndVerifyAffiliateWithRelationOneCondition(
+    id: number,
+    relation: string,
+    column: string,
+    data: any,
+  ): Promise<Affiliate | null> {
+    const affiliate = await this.affiliateRepository
+      .createQueryBuilder('affiliate')
+      .leftJoinAndSelect(`affiliate.${relation}`, 'relation', `relation.${column} = :data`, {
+        data,
+      })
+      .where('affiliate.id = :id', { id })
+      .getOne();
+
+    if (!affiliate) {
+      throw new NotFoundException(`Affiliate not found with ID ${id}`);
     }
     return affiliate;
   }
