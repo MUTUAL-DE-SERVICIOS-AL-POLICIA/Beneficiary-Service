@@ -71,7 +71,7 @@ export class AffiliatesService {
         this.ftpService.connectToFtp(),
       ]);
 
-      const initialPath = `Affiliate/Documents/${affiliate_id}/`
+      const initialPath = `Affiliate/Documents/${affiliate_id}/`;
 
       const affiliateDocument = new AffiliateDocument();
       affiliateDocument.affiliate = affiliate;
@@ -80,12 +80,12 @@ export class AffiliatesService {
 
       const verifyPath = `${process.env.FTP_ROOT}${initialPath}`;
       const remotePath = `${process.env.FTP_ROOT}${affiliateDocument.path}`;
-      
+
       await Promise.all([
-          this.affiliateDocumentsRepository.save(affiliateDocument),
-          this.ftpService.uploadFile(document_pdf, verifyPath, remotePath),
+        this.affiliateDocumentsRepository.save(affiliateDocument),
+        this.ftpService.uploadFile(document_pdf, verifyPath, remotePath),
       ]);
-      
+
       return {
         status: 201,
         message: `${document.name} Guardado exitosamente`,

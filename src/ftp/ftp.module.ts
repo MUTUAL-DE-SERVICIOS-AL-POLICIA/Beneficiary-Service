@@ -4,6 +4,6 @@ import { FtpService } from './ftp.service';
 @Global()
 @Module({
   providers: [FtpService],
-  exports: [FtpService]
+  exports: [FtpService],
 })
 export class FtpModule {}
