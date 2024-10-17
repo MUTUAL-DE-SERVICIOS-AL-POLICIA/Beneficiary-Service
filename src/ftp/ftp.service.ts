@@ -36,4 +36,8 @@ export class FtpService {
       console.error('Failed to upload file:', error);
     }
   }
+
+  async onDestroy() {
+    this.client.close();
+  }
 }
