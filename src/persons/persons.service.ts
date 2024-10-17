@@ -105,14 +105,31 @@ export class PersonsService {
     }
   }
 
-  async findPersonAffiliatesWithDetails(id: number): Promise<any> {
-    const person = await this.findAndVerifyPersonWithRelations(
-      id,
-      'personAffiliates',
-      'affiliates',
-      'type',
-    );
-    return person;
+  async findPersonAffiliatesWithDetails(id: number): Promise<Person> {
+    try {
+      const person = await this.findAndVerifyPersonWithRelations(
+        id,
+        'personAffiliates',
+        'affiliates',
+        'type',
+      );
+      const mappedPerson = {
+        ...person,
+        city_birth_name: await this.VerifyIdAndGetNameMatched(person.city_birth_id, 'cities'),
+        pension_entity_name: await this.VerifyIdAndGetNameMatched(
+          person.pension_entity_id,
+          'pensionEntities',
+        ),
+        financial_entity: await this.VerifyIdAndGetNameMatched(
+          person.financial_entity_id,
+          'financialEntities',
+        ),
+      };
+      return mappedPerson;
+    } catch (error) {
+      this.handleDBException(error);
+      throw new Error('Error retrieving person data');
+    }
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
