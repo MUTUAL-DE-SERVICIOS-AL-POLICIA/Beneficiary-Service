@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommonModule } from './common/common.module';
 import { AffiliatesModule } from './affiliates/affiliates.module';
+import { FtpModule } from './ftp/ftp.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AffiliatesModule } from './affiliates/affiliates.module';
     PersonsModule,
     CommonModule,
     AffiliatesModule,
+    FtpModule,
   ],
   controllers: [],
   providers: [],
