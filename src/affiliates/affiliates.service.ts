@@ -44,6 +44,55 @@ export class AffiliatesService {
     return affiliate;
   }
 
+  async findOneData(id: number): Promise<any> {
+    try {
+      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, [
+        'affiliateState',
+        'affiliateState.stateType',
+      ]);
+
+      const [dataDegree, dataUnit, dataCategory] = await Promise.all([
+        affiliate.degreeId ? this.callMS({ id: affiliate.degreeId }, 'degrees.findOne') : null,
+        affiliate.unitId ? this.callMS({ id: affiliate.unitId }, 'units.findOne') : null,
+        affiliate.categoryId
+          ? this.callMS({ id: affiliate.categoryId }, 'categories.findOne')
+          : null,
+      ]);
+
+      const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
+        affiliate;
+      const {
+        code: degreeCode,
+        shortened: degreeShortened,
+        correlative,
+        is_active,
+        hierarchy,
+        ...degree
+      } = dataDegree;
+      const {
+        created_at,
+        updated_at,
+        deleted_at,
+        breakdown,
+        code: unitCode,
+        shortened: unitShortened,
+        ...unit
+      } = dataUnit;
+      const { from, to, ...category } = dataCategory;
+
+      const totalAffiliate = {
+        ...dataAffiliate,
+        degree,
+        unit,
+        category,
+      };
+
+      return totalAffiliate;
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
+
   async createDocuments(
     affiliate_id: number,
     procedure_document_id: number,
