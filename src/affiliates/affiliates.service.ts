@@ -60,7 +60,7 @@ export class AffiliatesService {
       ]);
 
       const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
-        affiliate || {};
+        affiliate;
       const {
         code: degreeCode,
         shortened: degreeShortened,
@@ -78,7 +78,7 @@ export class AffiliatesService {
         shortened: unitShortened,
         ...unit
       } = dataUnit || {};
-      const { from, to, ...category } = dataCategory;
+      const { from, to, ...category } = dataCategory || {};
 
       const totalAffiliate = {
         ...dataAffiliate,
