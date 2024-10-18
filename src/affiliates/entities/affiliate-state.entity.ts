@@ -1,5 +1,5 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { stateType } from './';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Affiliate, StateType } from './';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliate_states' })
 export class AffiliateState {
@@ -9,6 +9,10 @@ export class AffiliateState {
   @Column()
   name: string;
 
-  @ManyToOne(() => stateType, (state_type) => state_type.affiliate_states)
-  state_type: stateType;
+  @ManyToOne(() => StateType, (state_type) => state_type.affiliateStates)
+  @JoinColumn({ name: 'state_type_id' })
+  stateType: StateType;
+
+  @OneToMany(() => Affiliate, (affiliates) => affiliates.affiliateState)
+  affiliates: Affiliate[];
 }

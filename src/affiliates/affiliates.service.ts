@@ -6,14 +6,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateAffiliateDto, UpdateAffiliateDto } from './dto';
 import { Affiliate, AffiliateDocument } from './entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { NATS_SERVICE } from 'src/config';
 import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
+import { catchError, firstValueFrom, of } from 'rxjs';
 import { FtpService } from '../ftp/ftp.service';
 
 @Injectable()
@@ -28,10 +27,6 @@ export class AffiliatesService {
     @Inject(NATS_SERVICE) private readonly client: ClientProxy,
     private ftpService: FtpService,
   ) {}
-
-  create(createAffiliateDto: CreateAffiliateDto) {
-    return 'This action adds a new affiliate';
-  }
 
   findAll(paginationDto: PaginationDto) {
     const { limit = 10, page = 1 } = paginationDto;
@@ -49,12 +44,53 @@ export class AffiliatesService {
     return affiliate;
   }
 
-  update(id: number, updateAffiliateDto: UpdateAffiliateDto) {
-    return `This action updates a #${id} affiliate`;
-  }
+  async findOneData(id: number): Promise<any> {
+    try {
+      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, [
+        'affiliateState',
+        'affiliateState.stateType',
+      ]);
 
-  remove(id: number) {
-    return `This action removes a #${id} affiliate`;
+      const [dataDegree, dataUnit, dataCategory] = await Promise.all([
+        affiliate.degreeId ? this.callMS({ id: affiliate.degreeId }, 'degrees.findOne') : null,
+        affiliate.unitId ? this.callMS({ id: affiliate.unitId }, 'units.findOne') : null,
+        affiliate.categoryId
+          ? this.callMS({ id: affiliate.categoryId }, 'categories.findOne')
+          : null,
+      ]);
+
+      const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
+        affiliate;
+      const {
+        code: degreeCode,
+        shortened: degreeShortened,
+        correlative,
+        is_active,
+        hierarchy,
+        ...degree
+      } = dataDegree;
+      const {
+        created_at,
+        updated_at,
+        deleted_at,
+        breakdown,
+        code: unitCode,
+        shortened: unitShortened,
+        ...unit
+      } = dataUnit;
+      const { from, to, ...category } = dataCategory;
+
+      const totalAffiliate = {
+        ...dataAffiliate,
+        degree,
+        unit,
+        category,
+      };
+
+      return totalAffiliate;
+    } catch (error) {
+      this.logger.error(error);
+    }
   }
 
   async createDocuments(
@@ -191,5 +227,16 @@ export class AffiliatesService {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexecpected Error');
+  }
+
+  private async callMS(data: any, service: string): Promise<any> {
+    return firstValueFrom(
+      this.client.send(service, data).pipe(
+        catchError((error) => {
+          this.logger.error(`Error calling microservice: ${service}`, error.message);
+          return of({ status: 's/n' });
+        }),
+      ),
+    );
   }
 }

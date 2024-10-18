@@ -1,4 +1,3 @@
-import { PersonAffiliate } from 'src/persons/entities';
 import {
   Column,
   CreateDateColumn,
@@ -7,8 +6,10 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
-import { AffiliateDocument } from './';
+import { AffiliateDocument, AffiliateState } from './';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliates' })
 export class Affiliate {
@@ -16,16 +17,13 @@ export class Affiliate {
   id: number;
 
   @Column('int', { nullable: true })
-  affiliate_state_id: number;
+  degreeId: number;
 
   @Column('int', { nullable: true })
-  degree_id: number;
+  unitId: number;
 
   @Column('int', { nullable: true })
-  unit_id: number;
-
-  @Column('int', { nullable: true })
-  category_id: number;
+  categoryId: number;
 
   @Column('text', { nullable: true })
   registration: string;
@@ -34,22 +32,22 @@ export class Affiliate {
   type: string;
 
   @Column('date', { nullable: true })
-  date_entry: Date;
+  dateEntry: Date;
 
   @Column('date', { nullable: true })
-  date_derelict: Date;
+  dateDerelict: Date;
 
   @Column('text', { nullable: true })
-  reason_derelict: Date;
+  reasonDerelict: Date;
 
   @Column('int', { nullable: true })
-  service_years: number;
+  serviceYears: number;
 
   @Column('int', { nullable: true })
-  service_months: number;
+  serviceMonths: number;
 
   @Column('text', { nullable: true })
-  unit_police_description: string;
+  unitPoliceDescription: string;
 
   @Column('text', { nullable: true })
   official: string;
@@ -61,20 +59,21 @@ export class Affiliate {
   departure: string;
 
   @Column('date', { nullable: true })
-  marriage_date: Date;
+  marriageDate: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
 
-  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
-  deletedAt: Date;
+  @DeleteDateColumn()
+  deletedAt?: Date;
 
   @OneToMany(() => AffiliateDocument, (affiliateDocuments) => affiliateDocuments.affiliate)
   affiliateDocuments: AffiliateDocument[];
 
-  @OneToMany(() => PersonAffiliate, (person_affiliate) => person_affiliate.type_id)
-  person_affiliate: PersonAffiliate[];
+  @ManyToOne(() => AffiliateState, (affiliateState) => affiliateState.affiliates)
+  @JoinColumn({ name: 'affiliate_state_id' })
+  affiliateState: AffiliateState;
 }
