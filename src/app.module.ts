@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommonModule } from './common/common.module';
 import { AffiliatesModule } from './affiliates/affiliates.module';
 import { FtpModule } from './ftp/ftp.module';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { FtpModule } from './ftp/ftp.module';
       password: process.env.DB_PASSWORD,
       autoLoadEntities: true,
       synchronize: true,
+      namingStrategy: new SnakeNamingStrategy(),
     }),
     PersonsModule,
     CommonModule,
