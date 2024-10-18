@@ -68,7 +68,7 @@ export class AffiliatesService {
         is_active,
         hierarchy,
         ...degree
-      } = dataDegree;
+      } = dataDegree || {};
       const {
         created_at,
         updated_at,
@@ -77,8 +77,8 @@ export class AffiliatesService {
         code: unitCode,
         shortened: unitShortened,
         ...unit
-      } = dataUnit;
-      const { from, to, ...category } = dataCategory;
+      } = dataUnit || {};
+      const { from, to, ...category } = dataCategory || {};
 
       const totalAffiliate = {
         ...dataAffiliate,

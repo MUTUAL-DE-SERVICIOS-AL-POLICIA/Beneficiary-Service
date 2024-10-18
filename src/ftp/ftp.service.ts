@@ -23,6 +23,7 @@ export class FtpService {
       this.logger.log('Connected to FTP server successfully');
     } catch (error) {
       this.logger.error('Failed to connect to FTP server:', error);
+      throw new Error('Failed to connect to FTP server');
     }
   }
 
@@ -35,6 +36,7 @@ export class FtpService {
       this.logger.log('Uploaded file successfully');
     } catch (error) {
       this.logger.error('Failed to upload file:', error);
+      throw new Error('Failed to upload file');
     }
   }
 
@@ -53,6 +55,7 @@ export class FtpService {
       return Buffer.concat(chunks);
     } catch (error) {
       this.logger.error('Failed to download file:', error);
+      throw new Error('Failed to download file:');
     }
   }
 
