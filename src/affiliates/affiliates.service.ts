@@ -6,14 +6,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateAffiliateDto, UpdateAffiliateDto } from './dto';
 import { Affiliate, AffiliateDocument } from './entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { NATS_SERVICE } from 'src/config';
 import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
+import { catchError, firstValueFrom, of } from 'rxjs';
 import { FtpService } from '../ftp/ftp.service';
 
 @Injectable()
@@ -29,10 +28,6 @@ export class AffiliatesService {
     private ftpService: FtpService,
   ) {}
 
-  create(createAffiliateDto: CreateAffiliateDto) {
-    return 'This action adds a new affiliate';
-  }
-
   findAll(paginationDto: PaginationDto) {
     const { limit = 10, page = 1 } = paginationDto;
     const offset = (page - 1) * limit;
@@ -47,14 +42,6 @@ export class AffiliatesService {
 
     if (!affiliate) throw new NotFoundException(`Affiliate with: ${id} not found`);
     return affiliate;
-  }
-
-  update(id: number, updateAffiliateDto: UpdateAffiliateDto) {
-    return `This action updates a #${id} affiliate`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} affiliate`;
   }
 
   async createDocuments(
@@ -191,5 +178,16 @@ export class AffiliatesService {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexecpected Error');
+  }
+
+  private async callMS(data: any, service: string): Promise<any> {
+    return firstValueFrom(
+      this.client.send(service, data).pipe(
+        catchError((error) => {
+          this.logger.error(`Error calling microservice: ${service}`, error.message);
+          return of({ status: 's/n' });
+        }),
+      ),
+    );
   }
 }
