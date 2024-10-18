@@ -1,4 +1,4 @@
-import { PersonAffiliate } from './';
+import { PersonAffiliate, PersonFingerprint } from './';
 import {
   Column,
   CreateDateColumn,
@@ -96,7 +96,7 @@ export class Person {
 
   @Column('text', {
     nullable: true,
-  }) // Ahora es 'varchar'
+  })
   phone_number: string;
 
   @Column('text', {
@@ -126,6 +126,9 @@ export class Person {
 
   @OneToMany(() => PersonAffiliate, (personAffiliate) => personAffiliate.person)
   personAffiliates: PersonAffiliate[];
+
+  @OneToMany(() => PersonFingerprint, (personFingerprint) => personFingerprint.person)
+  personFingerprints: PersonFingerprint[];
 
   @Column('date', {
     nullable: true,
