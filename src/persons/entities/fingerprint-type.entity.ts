@@ -1,9 +1,9 @@
-import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { PersonFingerprint } from './person-fingerprint.entity';
 
 @Entity({ schema: 'beneficiaries', name: 'fingerprint_types' })
 export class FingerprintType {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('increment')
   id: number;
 
   @Column('text')
