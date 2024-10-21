@@ -27,12 +27,15 @@ export class FtpService {
     }
   }
 
-  async uploadFile(document: Buffer, verifyPath: string, Path: string) {
+  async uploadFile(document: Buffer, initialPath: string, path: string) {
     try {
+      const verifyPath = `${envsFtp.ftpRoot}${initialPath}`;
+      const remotePath = `${envsFtp.ftpRoot}${path}`;
+
       const buffer = Buffer.from(document.buffer);
       const documentStream = Readable.from(buffer);
       await this.client.ensureDir(verifyPath);
-      await this.client.uploadFrom(documentStream, Path);
+      await this.client.uploadFrom(documentStream, remotePath);
       this.logger.log('Uploaded file successfully');
     } catch (error) {
       this.logger.error('Failed to upload file:', error);
