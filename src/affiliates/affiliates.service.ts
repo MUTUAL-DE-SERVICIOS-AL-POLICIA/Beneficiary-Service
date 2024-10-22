@@ -1,19 +1,14 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Affiliate, AffiliateDocument } from './entities';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PaginationDto, FtpService, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
-import { PaginationDto } from 'src/common/dtos/pagination.dto';
-import { NATS_SERVICE } from 'src/config';
-import { ClientProxy } from '@nestjs/microservices';
-import { catchError, firstValueFrom, of } from 'rxjs';
-import { FtpService } from '../ftp/ftp.service';
+import { Affiliate, AffiliateDocument } from './entities';
 
 @Injectable()
 export class AffiliatesService {
@@ -24,8 +19,8 @@ export class AffiliatesService {
     private readonly affiliateRepository: Repository<Affiliate>,
     @InjectRepository(AffiliateDocument)
     private readonly affiliateDocumentsRepository: Repository<AffiliateDocument>,
-    @Inject(NATS_SERVICE) private readonly client: ClientProxy,
-    private ftpService: FtpService,
+    private readonly ftp: FtpService,
+    private readonly nats: NatsService,
   ) {}
 
   findAll(paginationDto: PaginationDto) {
@@ -45,120 +40,107 @@ export class AffiliatesService {
   }
 
   async findOneData(id: number): Promise<any> {
-    try {
-      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, [
-        'affiliateState',
-        'affiliateState.stateType',
-      ]);
+    const affiliate = await this.findAndVerifyAffiliateWithRelations(id, [
+      'affiliateState',
+      'affiliateState.stateType',
+    ]);
 
-      const [dataDegree, dataUnit, dataCategory] = await Promise.all([
-        affiliate.degreeId ? this.callMS({ id: affiliate.degreeId }, 'degrees.findOne') : null,
-        affiliate.unitId ? this.callMS({ id: affiliate.unitId }, 'units.findOne') : null,
-        affiliate.categoryId
-          ? this.callMS({ id: affiliate.categoryId }, 'categories.findOne')
-          : null,
-      ]);
+    const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
+      affiliate;
 
-      const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
-        affiliate;
-      const {
-        code: degreeCode,
-        shortened: degreeShortened,
-        correlative,
-        is_active,
-        hierarchy,
-        ...degree
-      } = dataDegree || {};
-      const {
-        created_at,
-        updated_at,
-        deleted_at,
-        breakdown,
-        code: unitCode,
-        shortened: unitShortened,
-        ...unit
-      } = dataUnit || {};
-      const { from, to, ...category } = dataCategory || {};
+    const [degree, unit, category] = await Promise.all([
+      this.nats.fetchAndClean(degreeId, 'degrees.findOne', [
+        'code',
+        'shortened',
+        'correlative',
+        'is_active',
+        'hierarchy',
+      ]),
+      this.nats.fetchAndClean(unitId, 'units.findOne', [
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'breakdown',
+        'code',
+        'shortened',
+      ]),
+      this.nats.fetchAndClean(categoryId, 'categories.findOne', ['from', 'to']),
+    ]);
 
-      const totalAffiliate = {
-        ...dataAffiliate,
-        degree,
-        unit,
-        category,
-      };
-
-      return totalAffiliate;
-    } catch (error) {
-      this.logger.error(error);
-    }
+    return {
+      ...dataAffiliate,
+      degree,
+      unit,
+      category,
+    };
   }
 
-  async createDocuments(
+  async createOrUpdateDocument(
     affiliate_id: number,
     procedure_document_id: number,
     document_pdf: Buffer,
-  ): Promise<{ status: number; message: string }> {
-    try {
-      const [document, affiliate] = await Promise.all([
-        firstValueFrom(
-          this.client.send('procedureDocuments.findOne', { id: procedure_document_id }),
-        ),
-        this.findAndVerifyAffiliateWithRelations(affiliate_id),
-        this.ftpService.connectToFtp(),
-      ]);
+  ): Promise<{ message: string }> {
+    const [document, affiliate] = await Promise.all([
+      this.nats.firstValue('procedureDocuments.findOne', { id: procedure_document_id }),
+      this.findAndVerifyAffiliateWithRelationOneCondition(
+        affiliate_id,
+        'affiliateDocuments',
+        'procedure_document_id',
+        procedure_document_id,
+      ),
+      this.ftp.connectToFtp(),
+    ]);
 
-      const initialPath = `Affiliate/Documents/${affiliate_id}/`;
+    const initialPath = `Affiliate/Documents/${affiliate_id}/`;
 
-      const affiliateDocument = new AffiliateDocument();
+    if (document.status === false)
+      throw new NotFoundException('Servicio de documentos no disponible');
+    let affiliateDocument: AffiliateDocument;
+    let response: string;
+    if (affiliate.affiliateDocuments.length === 0) {
+      affiliateDocument = new AffiliateDocument();
       affiliateDocument.affiliate = affiliate;
       affiliateDocument.procedure_document_id = procedure_document_id;
       affiliateDocument.path = `${initialPath}${document.name}.pdf`;
-
-      const verifyPath = `${process.env.FTP_ROOT}${initialPath}`;
-      const remotePath = `${process.env.FTP_ROOT}${affiliateDocument.path}`;
-
-      await Promise.all([
-        this.affiliateDocumentsRepository.save(affiliateDocument),
-        this.ftpService.uploadFile(document_pdf, verifyPath, remotePath),
-      ]);
-
-      return {
-        status: 201,
-        message: `${document.name} Guardado exitosamente`,
-      };
-    } catch (error) {
-      this.handleDBException(error);
-    } finally {
-      this.ftpService.onDestroy();
+      response = 'Creado';
+    } else {
+      affiliateDocument = affiliate.affiliateDocuments[0];
+      affiliateDocument.updated_at = new Date();
+      response = 'Actualizado';
     }
+
+    await Promise.all([
+      this.affiliateDocumentsRepository.save(affiliateDocument),
+      this.ftp.uploadFile(document_pdf, initialPath, affiliateDocument.path),
+    ]);
+
+    this.ftp.onDestroy();
+
+    return {
+      message: `${document.name} ${response} exitosamente`,
+    };
   }
 
-  async showDocuments(id: number): Promise<AffiliateDocument[]> {
-    try {
-      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, ['affiliateDocuments']);
-      const affiliateDocuments = affiliate.affiliateDocuments;
+  async showDocuments(id: number): Promise<any> {
+    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(id, [
+      'affiliateDocuments',
+    ]);
+    if (!affiliateDocuments.length) return [];
 
-      if (affiliateDocuments.length === 0) return affiliateDocuments;
+    if (affiliateDocuments.length === 0) return affiliateDocuments;
 
-      const procedureDocumentIds = affiliateDocuments.map((doc) => doc.procedure_document_id);
+    const procedureDocumentIds = affiliateDocuments.map(
+      ({ procedure_document_id }) => procedure_document_id,
+    );
+    const documentNames = await this.nats.firstValue('procedureDocuments.findAllByIds', {
+      ids: procedureDocumentIds,
+    });
 
-      const documentNames = await firstValueFrom(
-        this.client.send('procedureDocuments.findAllByIds', { ids: procedureDocumentIds }),
-      );
-
-      const mappedDocuments = affiliateDocuments.map((doc) => {
-        const name = documentNames[doc.procedure_document_id] || 'Unknown Document';
-        return {
-          ...doc,
-          name,
-        };
-      });
-
-      return mappedDocuments;
-    } catch (error) {
-      //return [];
-      this.handleDBException(error);
-    }
+    return affiliateDocuments.map(({ id, procedure_document_id }) => ({
+      id,
+      procedure_document_id,
+      name: documentNames[procedure_document_id] || 's/n',
+    }));
   }
 
   async findDocument(affiliate_id: number, procedure_document_id: number): Promise<Buffer> {
@@ -169,7 +151,7 @@ export class AffiliatesService {
 
       const [affiliate] = await Promise.all([
         this.findAndVerifyAffiliateWithRelationOneCondition(affiliate_id, relation, column, data),
-        this.ftpService.connectToFtp(),
+        this.ftp.connectToFtp(),
       ]);
 
       const documents = affiliate.affiliateDocuments;
@@ -178,14 +160,14 @@ export class AffiliatesService {
 
       const firstDocument = documents[0];
 
-      const documentDownload = await this.ftpService.downloadFile(firstDocument.path);
+      const documentDownload = await this.ftp.downloadFile(firstDocument.path);
 
       return documentDownload;
     } catch (error) {
       this.handleDBException(error);
       throw error;
     } finally {
-      this.ftpService.onDestroy();
+      this.ftp.onDestroy();
     }
   }
 
@@ -227,16 +209,5 @@ export class AffiliatesService {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexecpected Error');
-  }
-
-  private async callMS(data: any, service: string): Promise<any> {
-    return firstValueFrom(
-      this.client.send(service, data).pipe(
-        catchError((error) => {
-          this.logger.error(`Error calling microservice: ${service}`, error.message);
-          return of({ status: 's/n' });
-        }),
-      ),
-    );
   }
 }
