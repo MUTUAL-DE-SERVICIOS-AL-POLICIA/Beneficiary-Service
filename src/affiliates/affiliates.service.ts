@@ -1,19 +1,14 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Affiliate, AffiliateDocument } from './entities';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PaginationDto, FtpService, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
-import { PaginationDto } from 'src/common/dtos/pagination.dto';
-import { NATS_SERVICE } from 'src/config';
-import { ClientProxy } from '@nestjs/microservices';
-import { catchError, firstValueFrom, of } from 'rxjs';
-import { FtpService } from '../ftp/ftp.service';
+import { Affiliate, AffiliateDocument } from './entities';
 
 @Injectable()
 export class AffiliatesService {
@@ -24,8 +19,8 @@ export class AffiliatesService {
     private readonly affiliateRepository: Repository<Affiliate>,
     @InjectRepository(AffiliateDocument)
     private readonly affiliateDocumentsRepository: Repository<AffiliateDocument>,
-    @Inject(NATS_SERVICE) private readonly client: ClientProxy,
-    private ftpService: FtpService,
+    private readonly ftp: FtpService,
+    private readonly nats: NatsService,
   ) {}
 
   findAll(paginationDto: PaginationDto) {
@@ -45,54 +40,41 @@ export class AffiliatesService {
   }
 
   async findOneData(id: number): Promise<any> {
-    try {
-      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, [
-        'affiliateState',
-        'affiliateState.stateType',
-      ]);
+    const affiliate = await this.findAndVerifyAffiliateWithRelations(id, [
+      'affiliateState',
+      'affiliateState.stateType',
+    ]);
 
-      const [dataDegree, dataUnit, dataCategory] = await Promise.all([
-        affiliate.degreeId ? this.callMS({ id: affiliate.degreeId }, 'degrees.findOne') : null,
-        affiliate.unitId ? this.callMS({ id: affiliate.unitId }, 'units.findOne') : null,
-        affiliate.categoryId
-          ? this.callMS({ id: affiliate.categoryId }, 'categories.findOne')
-          : null,
-      ]);
+    const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
+      affiliate;
 
-      const { createdAt, updatedAt, deletedAt, degreeId, unitId, categoryId, ...dataAffiliate } =
-        affiliate;
-      const {
-        code: degreeCode,
-        shortened: degreeShortened,
-        correlative,
-        is_active,
-        hierarchy,
-        ...degree
-      } = dataDegree || {};
-      const {
-        created_at,
-        updated_at,
-        deleted_at,
-        breakdown,
-        code: unitCode,
-        shortened: unitShortened,
-        ...unit
-      } = dataUnit || {};
-      const { from, to, ...category } = dataCategory || {};
+    const [degree, unit, category] = await Promise.all([
+      this.nats.fetchAndClean(degreeId, 'degrees.findOne', [
+        'code',
+        'shortened',
+        'correlative',
+        'is_active',
+        'hierarchy',
+      ]),
+      this.nats.fetchAndClean(unitId, 'units.findOne', [
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'breakdown',
+        'code',
+        'shortened',
+      ]),
+      this.nats.fetchAndClean(categoryId, 'categories.findOne', ['from', 'to']),
+    ]);
 
-      const totalAffiliate = {
-        ...dataAffiliate,
-        degree,
-        unit,
-        category,
-      };
-
-      return totalAffiliate;
-    } catch (error) {
-      this.logger.error(error);
-    }
+    return {
+      ...dataAffiliate,
+      degree,
+      unit,
+      category,
+    };
   }
-
+  
   async createDocuments(
     affiliate_id: number,
     procedure_document_id: number,
@@ -227,16 +209,5 @@ export class AffiliatesService {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexecpected Error');
-  }
-
-  private async callMS(data: any, service: string): Promise<any> {
-    return firstValueFrom(
-      this.client.send(service, data).pipe(
-        catchError((error) => {
-          this.logger.error(`Error calling microservice: ${service}`, error.message);
-          return of({ status: 's/n' });
-        }),
-      ),
-    );
   }
 }
