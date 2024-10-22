@@ -1,8 +1,7 @@
 import { Controller, Get, Query, ParseIntPipe, UsePipes } from '@nestjs/common';
 import { AffiliatesService } from './affiliates.service';
-import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { PaginationDto, FileRequiredPipe } from 'src/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { FileRequiredPipe } from './pipes/file-required.pipe';
 @Controller('affiliates')
 export class AffiliatesController {
   constructor(private readonly affiliatesService: AffiliatesService) {}
@@ -22,13 +21,17 @@ export class AffiliatesController {
     return this.affiliatesService.findOneData(id);
   }
 
-  @MessagePattern('affiliate.createDocuments')
+  @MessagePattern('affiliate.createOrUpdateDocument')
   @UsePipes(new FileRequiredPipe())
-  async createDocuments(
+  async createOrUpdateDocument(
     @Payload() payload: { affiliateId: string; procedureDocumentId: string; document_pdf: Buffer },
   ) {
     const { affiliateId, procedureDocumentId, document_pdf } = payload;
-    return this.affiliatesService.createDocuments(+affiliateId, +procedureDocumentId, document_pdf);
+    return this.affiliatesService.createOrUpdateDocument(
+      +affiliateId,
+      +procedureDocumentId,
+      document_pdf,
+    );
   }
 
   @MessagePattern('affiliate.showDocuments')
