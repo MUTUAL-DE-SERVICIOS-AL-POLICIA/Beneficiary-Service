@@ -151,7 +151,7 @@ export class AffiliatesService {
 
       const [affiliate] = await Promise.all([
         this.findAndVerifyAffiliateWithRelationOneCondition(affiliate_id, relation, column, data),
-        this.ftpService.connectToFtp(),
+        this.ftp.connectToFtp(),
       ]);
 
       const documents = affiliate.affiliateDocuments;
@@ -160,14 +160,14 @@ export class AffiliatesService {
 
       const firstDocument = documents[0];
 
-      const documentDownload = await this.ftpService.downloadFile(firstDocument.path);
+      const documentDownload = await this.ftp.downloadFile(firstDocument.path);
 
       return documentDownload;
     } catch (error) {
       this.handleDBException(error);
       throw error;
     } finally {
-      this.ftpService.onDestroy();
+      this.ftp.onDestroy();
     }
   }
 
