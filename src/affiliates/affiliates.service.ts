@@ -121,32 +121,26 @@ export class AffiliatesService {
     };
   }
 
-  async showDocuments(id: number): Promise<AffiliateDocument[]> {
-    try {
-      const affiliate = await this.findAndVerifyAffiliateWithRelations(id, ['affiliateDocuments']);
-      const affiliateDocuments = affiliate.affiliateDocuments;
+  async showDocuments(id: number): Promise<any> {
+    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(id, [
+      'affiliateDocuments',
+    ]);
+    if (!affiliateDocuments.length) return [];
 
-      if (affiliateDocuments.length === 0) return affiliateDocuments;
+    if (affiliateDocuments.length === 0) return affiliateDocuments;
 
-      const procedureDocumentIds = affiliateDocuments.map((doc) => doc.procedure_document_id);
+    const procedureDocumentIds = affiliateDocuments.map(
+      ({ procedure_document_id }) => procedure_document_id,
+    );
+    const documentNames = await this.nats.firstValue('procedureDocuments.findAllByIds', {
+      ids: procedureDocumentIds,
+    });
 
-      const documentNames = await firstValueFrom(
-        this.client.send('procedureDocuments.findAllByIds', { ids: procedureDocumentIds }),
-      );
-
-      const mappedDocuments = affiliateDocuments.map((doc) => {
-        const name = documentNames[doc.procedure_document_id] || 'Unknown Document';
-        return {
-          ...doc,
-          name,
-        };
-      });
-
-      return mappedDocuments;
-    } catch (error) {
-      //return [];
-      this.handleDBException(error);
-    }
+    return affiliateDocuments.map(({ id, procedure_document_id }) => ({
+      id,
+      procedure_document_id,
+      name: documentNames[procedure_document_id] || 's/n',
+    }));
   }
 
   async findDocument(affiliate_id: number, procedure_document_id: number): Promise<Buffer> {
