@@ -74,45 +74,51 @@ export class AffiliatesService {
       category,
     };
   }
-  
-  async createDocuments(
+
+  async createOrUpdateDocument(
     affiliate_id: number,
     procedure_document_id: number,
     document_pdf: Buffer,
-  ): Promise<{ status: number; message: string }> {
-    try {
-      const [document, affiliate] = await Promise.all([
-        firstValueFrom(
-          this.client.send('procedureDocuments.findOne', { id: procedure_document_id }),
-        ),
-        this.findAndVerifyAffiliateWithRelations(affiliate_id),
-        this.ftpService.connectToFtp(),
-      ]);
+  ): Promise<{ message: string }> {
+    const [document, affiliate] = await Promise.all([
+      this.nats.firstValue('procedureDocuments.findOne', { id: procedure_document_id }),
+      this.findAndVerifyAffiliateWithRelationOneCondition(
+        affiliate_id,
+        'affiliateDocuments',
+        'procedure_document_id',
+        procedure_document_id,
+      ),
+      this.ftp.connectToFtp(),
+    ]);
 
-      const initialPath = `Affiliate/Documents/${affiliate_id}/`;
+    const initialPath = `Affiliate/Documents/${affiliate_id}/`;
 
-      const affiliateDocument = new AffiliateDocument();
+    if (document.status === false)
+      throw new NotFoundException('Servicio de documentos no disponible');
+    let affiliateDocument: AffiliateDocument;
+    let response: string;
+    if (affiliate.affiliateDocuments.length === 0) {
+      affiliateDocument = new AffiliateDocument();
       affiliateDocument.affiliate = affiliate;
       affiliateDocument.procedure_document_id = procedure_document_id;
       affiliateDocument.path = `${initialPath}${document.name}.pdf`;
-
-      const verifyPath = `${process.env.FTP_ROOT}${initialPath}`;
-      const remotePath = `${process.env.FTP_ROOT}${affiliateDocument.path}`;
-
-      await Promise.all([
-        this.affiliateDocumentsRepository.save(affiliateDocument),
-        this.ftpService.uploadFile(document_pdf, verifyPath, remotePath),
-      ]);
-
-      return {
-        status: 201,
-        message: `${document.name} Guardado exitosamente`,
-      };
-    } catch (error) {
-      this.handleDBException(error);
-    } finally {
-      this.ftpService.onDestroy();
+      response = 'Creado';
+    } else {
+      affiliateDocument = affiliate.affiliateDocuments[0];
+      affiliateDocument.updated_at = new Date();
+      response = 'Actualizado';
     }
+
+    await Promise.all([
+      this.affiliateDocumentsRepository.save(affiliateDocument),
+      this.ftp.uploadFile(document_pdf, initialPath, affiliateDocument.path),
+    ]);
+
+    this.ftp.onDestroy();
+
+    return {
+      message: `${document.name} ${response} exitosamente`,
+    };
   }
 
   async showDocuments(id: number): Promise<AffiliateDocument[]> {
