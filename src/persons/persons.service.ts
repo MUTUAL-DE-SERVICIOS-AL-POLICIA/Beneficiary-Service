@@ -112,12 +112,12 @@ export class PersonsService {
         'affiliates',
         'type',
       );
-      const {createdAt, updatedAt, deletedAt, uuid_column, city_birth_id, pension_entity_id, financial_entity_id, nua, id_person_senasir, date_last_contribution, personAffiliates, ...dataPerson  } =
+      const {createdAt, updatedAt, deletedAt, uuidColumn, cityBirthId, pensionEntityId, financialEntityId, nua, idPersonSenasir, dateLastContribution, personAffiliates, ...dataPerson  } =
       person;
       const personAffiliate = await Promise.all(
         personAffiliates.map(async (personAffiliate) => {
-          const {  kinship_type, created_at, updated_at, deleted_at, ...dataPersonAffiliate } = personAffiliate;
-          const kinship = await this.nats.fetchAndClean(kinship_type, 'kinships.findOne', [
+          const {  kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } = personAffiliate;
+          const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
             'code',
             'shortened',
             'correlative',
@@ -134,7 +134,7 @@ export class PersonsService {
         })
       );
       const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
-        this.nats.fetchAndClean(city_birth_id, 'cities.findOne', [
+        this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
           'second_shortened',
           'third_shortened',
           'to_bank',
@@ -145,16 +145,16 @@ export class PersonsService {
           'company_phones',
           'company_cellphones',
         ]),
-        this.nats.fetchAndClean(pension_entity_id, 'pensionEntities.findOne',[
+        this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne',[
           'type',
           'is_active',
         ]),
-        this.nats.fetchAndClean(financial_entity_id, 'financialEntities.findOne',[
+        this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne',[
           'created_at',
           'updated_at',
         ])
       ])
-      const birthDateLiteral = (format(person.birth_date, "d 'de' MMMM 'de' yyyy", { locale: es }))
+      const birthDateLiteral = (format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es }))
       return {
         ...dataPerson,
         birth_date: birthDateLiteral,
