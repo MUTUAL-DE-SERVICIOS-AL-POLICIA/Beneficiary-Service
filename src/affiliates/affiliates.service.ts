@@ -76,22 +76,22 @@ export class AffiliatesService {
   }
 
   async createOrUpdateDocument(
-    affiliate_id: number,
-    procedure_document_id: number,
-    document_pdf: Buffer,
+    affiliateId: number,
+    procedureDocumentId: number,
+    documentPdf: Buffer,
   ): Promise<{ message: string }> {
     const [document, affiliate] = await Promise.all([
-      this.nats.firstValue('procedureDocuments.findOne', { id: procedure_document_id }),
+      this.nats.firstValue('procedureDocuments.findOne', { id: procedureDocumentId }),
       this.findAndVerifyAffiliateWithRelationOneCondition(
-        affiliate_id,
+        affiliateId,
         'affiliateDocuments',
-        'procedure_document_id',
-        procedure_document_id,
+        'procedureDocumentId',
+        procedureDocumentId,
       ),
       this.ftp.connectToFtp(),
     ]);
 
-    const initialPath = `Affiliate/Documents/${affiliate_id}/`;
+    const initialPath = `Affiliate/Documents/${affiliateId}/`;
 
     if (document.status === false)
       throw new NotFoundException('Servicio de documentos no disponible');
@@ -100,18 +100,18 @@ export class AffiliatesService {
     if (affiliate.affiliateDocuments.length === 0) {
       affiliateDocument = new AffiliateDocument();
       affiliateDocument.affiliate = affiliate;
-      affiliateDocument.procedure_document_id = procedure_document_id;
+      affiliateDocument.procedureDocumentId = procedureDocumentId;
       affiliateDocument.path = `${initialPath}${document.name}.pdf`;
       response = 'Creado';
     } else {
       affiliateDocument = affiliate.affiliateDocuments[0];
-      affiliateDocument.updated_at = new Date();
+      affiliateDocument.updatedAt = new Date();
       response = 'Actualizado';
     }
 
     await Promise.all([
       this.affiliateDocumentsRepository.save(affiliateDocument),
-      this.ftp.uploadFile(document_pdf, initialPath, affiliateDocument.path),
+      this.ftp.uploadFile(documentPdf, initialPath, affiliateDocument.path),
     ]);
 
     this.ftp.onDestroy();
@@ -121,8 +121,8 @@ export class AffiliatesService {
     };
   }
 
-  async showDocuments(id: number): Promise<any> {
-    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(id, [
+  async showDocuments(affiliateId: number): Promise<any> {
+    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
       'affiliateDocuments',
     ]);
     if (!affiliateDocuments.length) return [];
@@ -130,27 +130,26 @@ export class AffiliatesService {
     if (affiliateDocuments.length === 0) return affiliateDocuments;
 
     const procedureDocumentIds = affiliateDocuments.map(
-      ({ procedure_document_id }) => procedure_document_id,
+      ({ procedureDocumentId }) => procedureDocumentId,
     );
     const documentNames = await this.nats.firstValue('procedureDocuments.findAllByIds', {
       ids: procedureDocumentIds,
     });
 
-    return affiliateDocuments.map(({ id, procedure_document_id }) => ({
-      id,
-      procedure_document_id,
-      name: documentNames[procedure_document_id] || 's/n',
+    return affiliateDocuments.map(({ procedureDocumentId }) => ({
+      procedureDocumentId,
+      name: documentNames[procedureDocumentId] || 's/n',
     }));
   }
 
-  async findDocument(affiliate_id: number, procedure_document_id: number): Promise<Buffer> {
+  async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
     try {
       const relation = 'affiliateDocuments';
       const column = 'procedure_document_id';
-      const data = procedure_document_id;
+      const data = procedureDocumentId;
 
       const [affiliate] = await Promise.all([
-        this.findAndVerifyAffiliateWithRelationOneCondition(affiliate_id, relation, column, data),
+        this.findAndVerifyAffiliateWithRelationOneCondition(affiliateId, relation, column, data),
         this.ftp.connectToFtp(),
       ]);
 
