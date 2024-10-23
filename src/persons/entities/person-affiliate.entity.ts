@@ -1,4 +1,3 @@
-// person-affiliate.entity.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -16,9 +15,9 @@ export class PersonAffiliate {
   @Column()
   type: 'affiliates' | 'persons';
   @Column()
-  type_id: number;
+  typeId: number;
   @Column()
-  kinship_type: number;
+  kinshipType: number;
   @Column()
   state: boolean;
 
