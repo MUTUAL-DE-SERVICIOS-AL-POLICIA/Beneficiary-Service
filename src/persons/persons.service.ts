@@ -12,9 +12,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Person } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
-import { ClientProxy } from '@nestjs/microservices';
-import { NATS_SERVICE } from 'src/config';
-import { firstValueFrom } from 'rxjs';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { NatsService } from 'src/common';
 
 @Injectable()
 export class PersonsService {
@@ -23,7 +23,7 @@ export class PersonsService {
   constructor(
     @InjectRepository(Person)
     private readonly personRepository: Repository<Person>,
-    @Inject(NATS_SERVICE) private readonly client: ClientProxy,
+    private readonly nats: NatsService,
   ) {}
   async create(createPersonDto: CreatePersonDto) {
     try {
@@ -105,31 +105,64 @@ export class PersonsService {
     }
   }
 
-  async findPersonAffiliatesWithDetails(id: number): Promise<Person> {
-    try {
+  async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
       const person = await this.findAndVerifyPersonWithRelations(
-        id,
+        personId,
         'personAffiliates',
         'affiliates',
         'type',
       );
-      const mappedPerson = {
-        ...person,
-        city_birth_name: await this.VerifyIdAndGetNameMatched(person.city_birth_id, 'cities'),
-        pension_entity_name: await this.VerifyIdAndGetNameMatched(
-          person.pension_entity_id,
-          'pensionEntities',
-        ),
-        financial_entity: await this.VerifyIdAndGetNameMatched(
-          person.financial_entity_id,
-          'financialEntities',
-        ),
-      };
-      return mappedPerson;
-    } catch (error) {
-      this.handleDBException(error);
-      throw new Error('Error retrieving person data');
-    }
+      const {createdAt, updatedAt, deletedAt, uuid_column, city_birth_id, pension_entity_id, financial_entity_id, nua, id_person_senasir, date_last_contribution, personAffiliates, ...dataPerson  } =
+      person;
+      const personAffiliate = await Promise.all(
+        personAffiliates.map(async (personAffiliate) => {
+          const {  kinship_type, created_at, updated_at, deleted_at, ...dataPersonAffiliate } = personAffiliate;
+          const kinship = await this.nats.fetchAndClean(kinship_type, 'kinships.findOne', [
+            'code',
+            'shortened',
+            'correlative',
+            'is_active',
+            'hierarchy',
+            'created_at',
+            'updated_at',
+            'deleted_at',
+          ]);
+          return {
+            ...dataPersonAffiliate,
+            kinship,
+          };
+        })
+      );
+      const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
+        this.nats.fetchAndClean(city_birth_id, 'cities.findOne', [
+          'second_shortened',
+          'third_shortened',
+          'to_bank',
+          'latitude',
+          'longitude',
+          'company_address',
+          'phone_prefix',
+          'company_phones',
+          'company_cellphones',
+        ]),
+        this.nats.fetchAndClean(pension_entity_id, 'pensionEntities.findOne',[
+          'type',
+          'is_active',
+        ]),
+        this.nats.fetchAndClean(financial_entity_id, 'financialEntities.findOne',[
+          'created_at',
+          'updated_at',
+        ])
+      ])
+      const birthDateLiteral = (format(person.birth_date, "d 'de' MMMM 'de' yyyy", { locale: es }))
+      return {
+        ...dataPerson,
+        birth_date: birthDateLiteral,
+        personAffiliate,
+        cityBirth,
+        pensionEntity,
+        financialEntity
+      }
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
@@ -170,12 +203,5 @@ export class PersonsService {
       ...person,
       personAffiliates: filteredRelatedData,
     };
-  }
-  private async VerifyIdAndGetNameMatched(id: number | null, service: string): Promise<any | null> {
-    if (id) {
-      const entity = await firstValueFrom(this.client.send(`${service}.findOne`, { id: id }));
-      return entity.name;
-    }
-    return null;
   }
 }
