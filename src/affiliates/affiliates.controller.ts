@@ -12,38 +12,38 @@ export class AffiliatesController {
     return this.affiliatesService.findAll(paginationDto);
   }
   @MessagePattern('affiliate.findOne')
-  findOne(@Payload('id', ParseIntPipe) id: number) {
-    return this.affiliatesService.findOne(id);
+  findOne(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.findOne(affiliateId);
   }
 
   @MessagePattern('affiliate.findOneData')
-  findOneData(@Payload('id', ParseIntPipe) id: number) {
-    return this.affiliatesService.findOneData(id);
+  findOneData(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.findOneData(affiliateId);
   }
 
   @MessagePattern('affiliate.createOrUpdateDocument')
   @UsePipes(new FileRequiredPipe())
   async createOrUpdateDocument(
-    @Payload() payload: { affiliateId: string; procedureDocumentId: string; document_pdf: Buffer },
+    @Payload() payload: { affiliateId: string; procedureDocumentId: string; documentPdf: Buffer },
   ) {
-    const { affiliateId, procedureDocumentId, document_pdf } = payload;
+    const { affiliateId, procedureDocumentId, documentPdf } = payload;
     return this.affiliatesService.createOrUpdateDocument(
       +affiliateId,
       +procedureDocumentId,
-      document_pdf,
+      documentPdf,
     );
   }
 
   @MessagePattern('affiliate.showDocuments')
-  showDocuments(@Payload('id', ParseIntPipe) affiliate_id: number) {
-    return this.affiliatesService.showDocuments(affiliate_id);
+  showDocuments(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.showDocuments(affiliateId);
   }
 
   @MessagePattern('affiliate.findDocument')
   findDocument(
-    @Payload('affiliate_id', ParseIntPipe) affiliate_id: number,
-    @Payload('procedure_document_id', ParseIntPipe) procedure_document_id: number,
+    @Payload('affiliateId', ParseIntPipe) affiliateId: number,
+    @Payload('procedureDocumentId', ParseIntPipe) procedureDocumentId: number,
   ) {
-    return this.affiliatesService.findDocument(affiliate_id, procedure_document_id);
+    return this.affiliatesService.findDocument(affiliateId, procedureDocumentId);
   }
 }
