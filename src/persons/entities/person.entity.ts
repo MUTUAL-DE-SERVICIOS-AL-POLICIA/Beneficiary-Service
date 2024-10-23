@@ -17,92 +17,92 @@ export class Person {
 
   @Column('uuid')
   @Generated('uuid')
-  uuid_column: string;
+  uuidColumn: string;
 
   @Column('int', {
     nullable: true,
   })
-  city_birth_id: number;
+  cityBirthId: number;
 
   @Column('int', {
     nullable: true,
   })
-  pension_entity_id: number;
+  pensionEntityId: number;
 
   @Column('int', {
     nullable: true,
   })
-  financial_entity_id: number;
+  financialEntityId: number;
 
   @Column('text')
-  first_name: string;
+  firstName: string;
 
   @Column('text', {
     nullable: true,
   })
-  second_name: string;
+  secondName: string;
 
   @Column('text', {
     nullable: true,
   })
-  last_name: string;
+  lastName: string;
 
   @Column('text', {
     nullable: true,
   })
-  mothers_last_name: string;
+  mothersLastName: string;
 
   @Column('text', {
     nullable: true,
   })
-  surname_husband: string;
+  surnameHusband: string;
 
   @Column('text')
-  identity_card: string;
+  identityCard: string;
 
   @Column('date', {
     nullable: true,
   })
-  due_date: Date;
+  dueDate: Date;
 
   @Column('boolean', { default: false })
-  is_duedate_undefined: boolean;
+  isDuedateUndefined: boolean;
 
   @Column('char', { length: 1, nullable: true })
   gender: string;
 
   @Column('char', { length: 1, nullable: true })
-  civil_status: string;
+  civilStatus: string;
 
   @Column('date', {
     nullable: true,
   })
-  birth_date: Date;
+  birthDate: Date;
 
   @Column('date', {
     nullable: true,
   })
-  date_death: Date;
+  dateDeath: Date;
 
   @Column('text', {
     nullable: true,
   })
-  death_certificate_number: string;
+  deathCertificateNumber: string;
 
   @Column('text', {
     nullable: true,
   })
-  reason_death: string;
+  reasonDeath: string;
 
   @Column('text', {
     nullable: true,
   })
-  phone_number: string;
+  phoneNumber: string;
 
   @Column('text', {
     nullable: true,
   })
-  cell_phone_number: string;
+  cellPhoneNumber: string;
 
   @Column('int', {
     nullable: true,
@@ -112,17 +112,17 @@ export class Person {
   @Column('text', {
     nullable: true,
   })
-  account_number: string;
+  accountNumber: string;
 
   @Column('text', {
     nullable: true,
   })
-  sigep_status: string;
+  sigepStatus: string;
 
   @Column('int', {
     nullable: true,
   })
-  id_person_senasir: number;
+  idPersonSenasir: number;
 
   @OneToMany(() => PersonAffiliate, (personAffiliate) => personAffiliate.person)
   personAffiliates: PersonAffiliate[];
@@ -133,7 +133,7 @@ export class Person {
   @Column('date', {
     nullable: true,
   })
-  date_last_contribution: Date;
+  dateLastContribution: Date;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
