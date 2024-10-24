@@ -53,13 +53,13 @@ export class AffiliatesService {
         'code',
         'shortened',
         'correlative',
-        'is_active',
+        'isActive',
         'hierarchy',
       ]),
       this.nats.fetchAndClean(unitId, 'units.findOne', [
-        'created_at',
-        'updated_at',
-        'deleted_at',
+        'createdAt',
+        'updatedAt',
+        'deletedAt',
         'breakdown',
         'code',
         'shortened',
@@ -79,7 +79,7 @@ export class AffiliatesService {
     affiliateId: number,
     procedureDocumentId: number,
     documentPdf: Buffer,
-  ): Promise<{ message: string }> {
+  ): Promise<{ status: boolean; message: string }> {
     const [document, affiliate] = await Promise.all([
       this.nats.firstValue('procedureDocuments.findOne', { id: procedureDocumentId }),
       this.findAndVerifyAffiliateWithRelationOneCondition(
@@ -117,6 +117,7 @@ export class AffiliatesService {
     this.ftp.onDestroy();
 
     return {
+      status: document.status,
       message: `${document.name} ${response} exitosamente`,
     };
   }
@@ -145,7 +146,7 @@ export class AffiliatesService {
   async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
     try {
       const relation = 'affiliateDocuments';
-      const column = 'procedure_document_id';
+      const column = 'procedureDocumentId';
       const data = procedureDocumentId;
 
       const [affiliate] = await Promise.all([
