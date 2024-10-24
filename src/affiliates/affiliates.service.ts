@@ -140,6 +140,7 @@ export class AffiliatesService {
     return affiliateDocuments.map(({ procedureDocumentId }) => ({
       procedureDocumentId,
       name: documentNames[procedureDocumentId] || 's/n',
+      status: documentNames.status,
     }));
   }
 
