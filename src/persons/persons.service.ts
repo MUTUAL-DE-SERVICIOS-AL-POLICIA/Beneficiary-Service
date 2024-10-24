@@ -118,14 +118,9 @@ export class PersonsService {
         personAffiliates.map(async (personAffiliate) => {
           const {  kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } = personAffiliate;
           const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-            'code',
-            'shortened',
-            'correlative',
-            'is_active',
-            'hierarchy',
-            'created_at',
-            'updated_at',
-            'deleted_at',
+            'createdAt',
+            'updatedAt',
+            'deletedAt',
           ]);
           return {
             ...dataPersonAffiliate,
@@ -135,29 +130,29 @@ export class PersonsService {
       );
       const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
         this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
-          'second_shortened',
-          'third_shortened',
-          'to_bank',
+          'secondShortened',
+          'thirdShortened',
+          'toBank',
           'latitude',
           'longitude',
-          'company_address',
-          'phone_prefix',
-          'company_phones',
-          'company_cellphones',
+          'companyAddress',
+          'phonePrefix',
+          'companyPhones',
+          'companyCellphones',
         ]),
         this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne',[
           'type',
-          'is_active',
+          'isActive',
         ]),
         this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne',[
-          'created_at',
-          'updated_at',
+          'createdAt',
+          'updatedAt',
         ])
       ])
       const birthDateLiteral = (format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es }))
       return {
         ...dataPerson,
-        birth_date: birthDateLiteral,
+        birthDateLiteral: birthDateLiteral,
         personAffiliate,
         cityBirth,
         pensionEntity,
