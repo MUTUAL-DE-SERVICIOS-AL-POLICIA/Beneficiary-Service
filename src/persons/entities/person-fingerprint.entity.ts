@@ -5,12 +5,12 @@ import {
   DeleteDateColumn,
   Entity,
   ManyToOne,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 @Entity({ schema: 'beneficiaries', name: 'person_fingerprints' })
 export class PersonFingerprint {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id: number;
 
   @Column('int')
@@ -22,15 +22,15 @@ export class PersonFingerprint {
   @ManyToOne(() => Person, (person) => person.personFingerprints)
   person: Person;
 
-  @ManyToOne(() => FingerprintType, (fingerprintType) => fingerprintType.person_fingerprints)
-  fingerprint_type: FingerprintType;
+  @ManyToOne(() => FingerprintType, (fingerprintType) => fingerprintType.personFingerprints)
+  fingerprintType: FingerprintType;
 
   @CreateDateColumn({ name: 'created_at' })
-  created_at: Date;
+  createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updated_at: Date;
+  updatedAt: Date;
 
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
-  deleted_at: Date;
+  deletedAt: Date;
 }
