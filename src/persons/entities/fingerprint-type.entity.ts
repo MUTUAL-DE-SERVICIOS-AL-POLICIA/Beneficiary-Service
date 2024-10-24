@@ -9,6 +9,9 @@ export class FingerprintType {
   @Column('text')
   name: string;
 
-  @OneToMany(() => PersonFingerprint, (personFingerprint) => personFingerprint.fingerprint_type)
-  person_fingerprints: PersonFingerprint[];
+  @Column('text')
+  short_name: string;
+
+  @OneToMany(() => PersonFingerprint, (personFingerprint) => personFingerprint.fingerprintType)
+  personFingerprints: PersonFingerprint[];
 }
