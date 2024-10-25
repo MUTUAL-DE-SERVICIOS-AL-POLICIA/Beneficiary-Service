@@ -4,6 +4,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
+import { CreatePersonFingerprintDto } from './dto';
 
 @Controller('persons')
 export class PersonsController {
@@ -43,5 +44,13 @@ export class PersonsController {
   @MessagePattern('person.findAffiliteRelatedWithPerson')
   async findAffiliteRelatedWithPerson(@Payload('id', ParseIntPipe) id: number) {
     return this.personsService.findAffiliteRelatedWithPerson(id);
+  }
+
+  @MessagePattern('person.createPersonFingerprint')
+  async createPersonFingerprint(
+    @Payload()
+    createreatePersonFingerprint: CreatePersonFingerprintDto,
+  ) {
+    return this.personsService.createPersonFingerPrint(createreatePersonFingerprint);
   }
 }
