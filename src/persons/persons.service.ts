@@ -1,20 +1,18 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreatePersonDto } from './dto/create-person.dto';
-import { UpdatePersonDto } from './dto/update-person.dto';
+import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Person } from './entities';
+import { FingerprintType, Person, PersonFingerprint } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { NatsService } from 'src/common';
+import { FtpService, NatsService } from 'src/common';
 
 @Injectable()
 export class PersonsService {
@@ -23,7 +21,12 @@ export class PersonsService {
   constructor(
     @InjectRepository(Person)
     private readonly personRepository: Repository<Person>,
+    @InjectRepository(PersonFingerprint)
+    private readonly personFingerprintRepository: Repository<PersonFingerprint>,
+    @InjectRepository(FingerprintType)
+    private readonly fingerprintTypeRepository: Repository<FingerprintType>,
     private readonly nats: NatsService,
+    private readonly ftp: FtpService,
   ) {}
   async create(createPersonDto: CreatePersonDto) {
     try {
@@ -106,58 +109,68 @@ export class PersonsService {
   }
 
   async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
-      const person = await this.findAndVerifyPersonWithRelations(
-        personId,
-        'personAffiliates',
-        'affiliates',
-        'type',
-      );
-      const {createdAt, updatedAt, deletedAt, uuidColumn, cityBirthId, pensionEntityId, financialEntityId, nua, idPersonSenasir, dateLastContribution, personAffiliates, ...dataPerson  } =
-      person;
-      const personAffiliate = await Promise.all(
-        personAffiliates.map(async (personAffiliate) => {
-          const {  kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } = personAffiliate;
-          const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-            'createdAt',
-            'updatedAt',
-            'deletedAt',
-          ]);
-          return {
-            ...dataPersonAffiliate,
-            kinship,
-          };
-        })
-      );
-      const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
-        this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
-          'secondShortened',
-          'thirdShortened',
-          'toBank',
-          'latitude',
-          'longitude',
-          'companyAddress',
-          'phonePrefix',
-          'companyPhones',
-          'companyCellphones',
-        ]),
-        this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne',[
-          'type',
-          'isActive',
-        ]),
-        this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne',[
+    const person = await this.findAndVerifyPersonWithRelations(
+      personId,
+      'personAffiliates',
+      'affiliates',
+      'type',
+    );
+    const {
+      createdAt,
+      updatedAt,
+      deletedAt,
+      uuidColumn,
+      cityBirthId,
+      pensionEntityId,
+      financialEntityId,
+      nua,
+      idPersonSenasir,
+      dateLastContribution,
+      personAffiliates,
+      ...dataPerson
+    } = person;
+    const personAffiliate = await Promise.all(
+      personAffiliates.map(async (personAffiliate) => {
+        const { kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
+          personAffiliate;
+        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
           'createdAt',
           'updatedAt',
-        ])
-      ])
-      const birthDateLiteral = (format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es }))
-      return {
-        ...dataPerson,
-        birthDateLiteral: birthDateLiteral,
-        personAffiliate,
-        cityBirth,
-        pensionEntity,
-        financialEntity
-      }
+          'deletedAt',
+        ]);
+        return {
+          ...dataPersonAffiliate,
+          kinship,
+        };
+      }),
+    );
+    const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
+      this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
+        'secondShortened',
+        'thirdShortened',
+        'toBank',
+        'latitude',
+        'longitude',
+        'companyAddress',
+        'phonePrefix',
+        'companyPhones',
+        'companyCellphones',
+      ]),
+      this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne', ['type', 'isActive']),
+      this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne', [
+        'createdAt',
+        'updatedAt',
+      ]),
+    ]);
+    const birthDateLiteral = format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es });
+    return {
+      ...dataPerson,
+      birthDateLiteral: birthDateLiteral,
+      personAffiliate,
+      cityBirth,
+      pensionEntity,
+      financialEntity,
+    };
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
@@ -169,6 +182,36 @@ export class PersonsService {
     );
     return personAffiliates;
   }
+
+  async createPersonFingerPrint(
+    createPersonFingerprintDto: CreatePersonFingerprintDto,
+  ): Promise<any> {
+    const { personId, quality, fingerprintTypeId, wsq } = createPersonFingerprintDto;
+    const buffer = Buffer.from(wsq, 'base64');
+    const [person, fingerprintType] = await Promise.all([
+      this.personRepository.findOne({ where: { id: personId } }),
+      this.fingerprintTypeRepository.findOne({ where: { id: fingerprintTypeId } }),
+    ]);
+    if (!person || !fingerprintType) {
+      throw new NotFoundException('Persona o tipo de huella no encontrado');
+    }
+    await this.ftp.connectToFtp();
+    const initialPath = `Person/Fingerprint/${personId}/`;
+    const path = `${initialPath}${fingerprintType.name}.wsq`;
+    const newPersonFingerprint = this.personFingerprintRepository.create({
+      person,
+      quality,
+      fingerprintType,
+      path,
+    });
+    await Promise.all([
+      this.personFingerprintRepository.save(newPersonFingerprint),
+      await this.ftp.uploadFile(buffer, initialPath, path),
+    ]);
+    await this.ftp.onDestroy();
+    return newPersonFingerprint;
+  }
+
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
