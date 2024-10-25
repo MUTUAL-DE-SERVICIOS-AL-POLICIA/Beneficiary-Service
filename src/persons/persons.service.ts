@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreatePersonDto,UpdatePersonDto } from './dto';
+import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FingerprintType, Person, PersonFingerprint } from './entities';
@@ -182,6 +182,36 @@ export class PersonsService {
     );
     return personAffiliates;
   }
+
+  async createPersonFingerPrint(
+    createPersonFingerprintDto: CreatePersonFingerprintDto,
+  ): Promise<any> {
+    const { personId, quality, fingerprintTypeId, wsq } = createPersonFingerprintDto;
+    const buffer = Buffer.from(wsq, 'base64');
+    const [person, fingerprintType] = await Promise.all([
+      this.personRepository.findOne({ where: { id: personId } }),
+      this.fingerprintTypeRepository.findOne({ where: { id: fingerprintTypeId } }),
+    ]);
+    if (!person || !fingerprintType) {
+      throw new NotFoundException('Persona o tipo de huella no encontrado');
+    }
+    await this.ftp.connectToFtp();
+    const initialPath = `Person/Fingerprint/${personId}/`;
+    const path = `${initialPath}${fingerprintType.name}.wsq`;
+    const newPersonFingerprint = this.personFingerprintRepository.create({
+      person,
+      quality,
+      fingerprintType,
+      path,
+    });
+    await Promise.all([
+      this.personFingerprintRepository.save(newPersonFingerprint),
+      await this.ftp.uploadFile(buffer, initialPath, path),
+    ]);
+    await this.ftp.onDestroy();
+    return newPersonFingerprint;
+  }
+
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
