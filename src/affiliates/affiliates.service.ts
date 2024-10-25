@@ -162,7 +162,6 @@ export class AffiliatesService {
       const firstDocument = documents[0];
 
       const documentDownload = await this.ftp.downloadFile(firstDocument.path);
-
       return documentDownload;
     } catch (error) {
       this.handleDBException(error);
@@ -170,6 +169,21 @@ export class AffiliatesService {
     } finally {
       this.ftp.onDestroy();
     }
+  }
+
+  async collateDocuments(affiliateId: number, modalityId: number): Promise<any> {
+    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
+      'affiliateDocuments',
+    ]);
+
+    //if (affiliate.affiliateDocuments.length === 0) return [];
+    const documentsRequirements = await this.nats.firstValue('modules.findDataRelations', {
+      id: modalityId,
+      entity: 'procedureModality',
+      relations: ['procedureRequirements'],
+    });
+    
+    return documentsRequirements;
   }
 
   private async findAndVerifyAffiliateWithRelations(
