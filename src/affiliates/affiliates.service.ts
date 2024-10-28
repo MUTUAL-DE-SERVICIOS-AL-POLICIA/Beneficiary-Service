@@ -126,22 +126,23 @@ export class AffiliatesService {
     const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
       'affiliateDocuments',
     ]);
-    if (!affiliateDocuments.length) return [];
 
-    if (affiliateDocuments.length === 0) return affiliateDocuments;
+    if (!affiliateDocuments.length) return affiliateDocuments;
 
     const procedureDocumentIds = affiliateDocuments.map(
       ({ procedureDocumentId }) => procedureDocumentId,
     );
+
     const documentNames = await this.nats.firstValue('procedureDocuments.findAllByIds', {
       ids: procedureDocumentIds,
     });
 
-    return affiliateDocuments.map(({ procedureDocumentId }) => ({
+    const documentsAffiliate = affiliateDocuments.map(({ procedureDocumentId }) => ({
       procedureDocumentId,
       name: documentNames[procedureDocumentId] || 's/n',
-      status: documentNames.status,
     }));
+
+    return { status: documentNames.status, documentsAffiliate };
   }
 
   async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
@@ -182,7 +183,7 @@ export class AffiliatesService {
       entity: 'procedureModality',
       relations: ['procedureRequirements'],
     });
-    
+
     return documentsRequirements;
   }
 
