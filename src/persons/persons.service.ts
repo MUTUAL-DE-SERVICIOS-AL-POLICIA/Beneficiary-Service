@@ -204,6 +204,18 @@ export class PersonsService {
     return newPersonFingerprint;
   }
 
+  async showFingerprintRegistered(personId: number): Promise<any> {
+    const person = await this.personRepository.findOne({
+      where: { id: personId },
+      relations: ['personFingerprints', 'personFingerprints.fingerprintType'],
+    });
+    const fingerprints = person.personFingerprints.map((fingerprint) => ({
+      id: fingerprint.fingerprintType.id,
+      name: fingerprint.fingerprintType.name,
+    }));
+    return { fingerprints };
+  }
+
   private handleDBException(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
