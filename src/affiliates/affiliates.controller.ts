@@ -46,4 +46,12 @@ export class AffiliatesController {
   ) {
     return this.affiliatesService.findDocument(affiliateId, procedureDocumentId);
   }
+
+  @MessagePattern('affiliate.collateDocuments')
+  collateDocuments(
+    @Payload('affiliateId', ParseIntPipe) affiliateId: number,
+    @Payload('modalityId', ParseIntPipe) modalityId: number,
+  ) {
+    return this.affiliatesService.collateDocuments(affiliateId, modalityId);
+  }
 }

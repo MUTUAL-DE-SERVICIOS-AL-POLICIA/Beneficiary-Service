@@ -126,22 +126,23 @@ export class AffiliatesService {
     const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
       'affiliateDocuments',
     ]);
-    if (!affiliateDocuments.length) return [];
 
-    if (affiliateDocuments.length === 0) return affiliateDocuments;
+    if (!affiliateDocuments.length) return affiliateDocuments;
 
     const procedureDocumentIds = affiliateDocuments.map(
       ({ procedureDocumentId }) => procedureDocumentId,
     );
+
     const documentNames = await this.nats.firstValue('procedureDocuments.findAllByIds', {
       ids: procedureDocumentIds,
     });
 
-    return affiliateDocuments.map(({ procedureDocumentId }) => ({
+    const documentsAffiliate = affiliateDocuments.map(({ procedureDocumentId }) => ({
       procedureDocumentId,
       name: documentNames[procedureDocumentId] || 's/n',
-      status: documentNames.status,
     }));
+
+    return { status: documentNames.status, documentsAffiliate };
   }
 
   async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
@@ -162,7 +163,6 @@ export class AffiliatesService {
       const firstDocument = documents[0];
 
       const documentDownload = await this.ftp.downloadFile(firstDocument.path);
-
       return documentDownload;
     } catch (error) {
       this.handleDBException(error);
@@ -170,6 +170,21 @@ export class AffiliatesService {
     } finally {
       this.ftp.onDestroy();
     }
+  }
+
+  async collateDocuments(affiliateId: number, modalityId: number): Promise<any> {
+    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
+      'affiliateDocuments',
+    ]);
+
+    //if (affiliate.affiliateDocuments.length === 0) return [];
+    const documentsRequirements = await this.nats.firstValue('modules.findDataRelations', {
+      id: modalityId,
+      entity: 'procedureModality',
+      relations: ['procedureRequirements'],
+    });
+
+    return documentsRequirements;
   }
 
   private async findAndVerifyAffiliateWithRelations(
