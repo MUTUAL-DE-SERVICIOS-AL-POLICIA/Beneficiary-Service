@@ -53,4 +53,9 @@ export class PersonsController {
   ) {
     return this.personsService.createPersonFingerPrint(createreatePersonFingerprint);
   }
+
+  @MessagePattern('person.showFingerprintRegistered')
+  async showFingerprintRegistered(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.showFingerprintRegistered(id);
+  }
 }
