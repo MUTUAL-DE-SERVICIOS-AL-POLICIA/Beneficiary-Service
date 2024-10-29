@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginationDto, FtpService, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
@@ -139,52 +133,78 @@ export class AffiliatesService {
 
     const documentsAffiliate = affiliateDocuments.map(({ procedureDocumentId }) => ({
       procedureDocumentId,
-      name: documentNames[procedureDocumentId] || 's/n',
+      ...documentNames[procedureDocumentId],
     }));
 
     return { status: documentNames.status, documentsAffiliate };
   }
 
   async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
-    try {
-      const relation = 'affiliateDocuments';
-      const column = 'procedureDocumentId';
-      const data = procedureDocumentId;
+    const relation = 'affiliateDocuments';
+    const column = 'procedureDocumentId';
+    const data = procedureDocumentId;
 
-      const [affiliate] = await Promise.all([
-        this.findAndVerifyAffiliateWithRelationOneCondition(affiliateId, relation, column, data),
-        this.ftp.connectToFtp(),
-      ]);
+    const [affiliate] = await Promise.all([
+      this.findAndVerifyAffiliateWithRelationOneCondition(affiliateId, relation, column, data),
+      this.ftp.connectToFtp(),
+    ]);
 
-      const documents = affiliate.affiliateDocuments;
+    const documents = affiliate.affiliateDocuments;
 
-      if (documents.length === 0) throw new NotFoundException('Document not found');
+    if (documents.length === 0) throw new NotFoundException('Document not found');
 
-      const firstDocument = documents[0];
+    const firstDocument = documents[0];
 
-      const documentDownload = await this.ftp.downloadFile(firstDocument.path);
-      return documentDownload;
-    } catch (error) {
-      this.handleDBException(error);
-      throw error;
-    } finally {
-      this.ftp.onDestroy();
-    }
+    const documentDownload = await this.ftp.downloadFile(firstDocument.path);
+
+    this.ftp.onDestroy();
+
+    return documentDownload;
   }
 
   async collateDocuments(affiliateId: number, modalityId: number): Promise<any> {
-    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
-      'affiliateDocuments',
+    const [affiliate, modality] = await Promise.all([
+      this.findAndVerifyAffiliateWithRelations(affiliateId, ['affiliateDocuments']),
+      this.nats.firstValue('modules.findDataRelations', {
+        id: modalityId,
+        relations: ['procedureRequirements', 'procedureRequirements.procedureDocument'],
+        entity: 'procedureModality',
+      }),
     ]);
 
-    //if (affiliate.affiliateDocuments.length === 0) return [];
-    const documentsRequirements = await this.nats.firstValue('modules.findDataRelations', {
-      id: modalityId,
-      entity: 'procedureModality',
-      relations: ['procedureRequirements'],
-    });
+    if (modality.status === false) return modality;
 
-    return documentsRequirements;
+    const { affiliateDocuments } = affiliate;
+    const { procedureRequirements } = modality;
+
+    if (!procedureRequirements.length)
+      return { status: false, message: 'No hay documentos requeridos' };
+
+    if (!affiliateDocuments.length) {
+      const collateDocuments = procedureRequirements.map((res) => ({
+        procedureRequirementId: res.id,
+        number: res.number,
+        procedureDocumentId: res.procedureDocument.id,
+        name: res.procedureDocument.name,
+        isUploaded: false,
+      }));
+      return { status: modality.status, collateDocuments };
+    }
+
+    const affiliateDocumentsMap = new Map(
+      affiliateDocuments.map((doc) => [doc.procedureDocumentId, doc]),
+    );
+
+    const collateDocuments = procedureRequirements.map(({ procedureDocument, id, number }) => ({
+      procedureRequirementId: id,
+      number: number,
+      procedureDocumentId: procedureDocument.id,
+      name: procedureDocument.name,
+      shortened: procedureDocument.shortened,
+      isUploaded: affiliateDocumentsMap.has(procedureDocument.id),
+    }));
+
+    return { status: modality.status, collateDocuments };
   }
 
   private async findAndVerifyAffiliateWithRelations(
@@ -219,11 +239,5 @@ export class AffiliatesService {
       throw new NotFoundException(`Affiliate not found with ID ${id}`);
     }
     return affiliate;
-  }
-
-  private handleDBException(error: any) {
-    if (error.code === '23505') throw new BadRequestException(error.detail);
-    this.logger.error(error);
-    throw new InternalServerErrorException('Unexecpected Error');
   }
 }
