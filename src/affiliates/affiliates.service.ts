@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginationDto, FtpService, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
@@ -139,7 +133,7 @@ export class AffiliatesService {
 
     const documentsAffiliate = affiliateDocuments.map(({ procedureDocumentId }) => ({
       procedureDocumentId,
-      name: documentNames[procedureDocumentId] || 's/n',
+      ...documentNames[procedureDocumentId],
     }));
 
     return { status: documentNames.status, documentsAffiliate };
@@ -206,6 +200,7 @@ export class AffiliatesService {
       number: number,
       procedureDocumentId: procedureDocument.id,
       name: procedureDocument.name,
+      shortened: procedureDocument.shortened,
       isUploaded: affiliateDocumentsMap.has(procedureDocument.id),
     }));
 
@@ -244,11 +239,5 @@ export class AffiliatesService {
       throw new NotFoundException(`Affiliate not found with ID ${id}`);
     }
     return affiliate;
-  }
-
-  private handleDBException(error: any) {
-    if (error.code === '23505') throw new BadRequestException(error.detail);
-    this.logger.error(error);
-    throw new InternalServerErrorException('Unexecpected Error');
   }
 }
