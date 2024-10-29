@@ -10,15 +10,19 @@ export class CreateFingerprintsTypes implements Seeder {
     await repository.insert([
       {
         name: 'Pulgar Derecho',
+        short_name: 'r_thumb',
       },
       {
         name: 'Índice Derecho',
+        short_name: 'r_index',
       },
       {
         name: 'Pulgar Izquierdo',
+        short_name: 'l_thumb',
       },
       {
         name: 'Índice Izquierdo',
+        short_name: 'l_index',
       },
     ]);
   }
