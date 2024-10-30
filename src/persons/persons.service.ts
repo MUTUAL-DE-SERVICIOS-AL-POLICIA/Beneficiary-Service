@@ -37,6 +37,10 @@ export class PersonsService {
       this.handleDBException(error);
     }
   }
+  async showListFingerprint(): Promise<any> {
+    const listFingerprint = await this.fingerprintTypeRepository.find();
+    return listFingerprint.map(({ id, name }) => ({ id, name }));
+  }
 
   async findAll(filteredPaginationDto: FilteredPaginationDto) {
     const { limit = 10, page = 1, filter } = filteredPaginationDto;
