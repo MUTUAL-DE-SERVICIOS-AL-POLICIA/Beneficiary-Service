@@ -1,14 +1,7 @@
-import { IsInt, IsString, IsNotEmpty } from 'class-validator';
+import { IsInt, IsString, IsNotEmpty, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class CreatePersonFingerprintDto {
-  @IsInt()
-  @IsNotEmpty()
-  quality: number;
-
-  @IsInt()
-  @IsNotEmpty()
-  personId: number;
-
+class FingerprintData {
   @IsInt()
   @IsNotEmpty()
   fingerprintTypeId: number;
@@ -16,4 +9,19 @@ export class CreatePersonFingerprintDto {
   @IsNotEmpty()
   @IsString()
   wsq: string;
+
+  @IsInt()
+  @IsNotEmpty()
+  quality: number;
+}
+
+export class CreatePersonFingerprintDto {
+  @IsInt()
+  @IsNotEmpty()
+  personId: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FingerprintData)
+  fingerprints: FingerprintData[];
 }
