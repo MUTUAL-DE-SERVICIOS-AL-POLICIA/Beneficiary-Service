@@ -66,7 +66,7 @@ export class PersonsService {
     };
   }
 
-  async findOne(idPerson: number) {
+  async findOne(idPerson: number): Promise<Person> {
     const person = await this.personRepository.findOne({
       where: { id: idPerson },
     });
@@ -177,31 +177,66 @@ export class PersonsService {
 
   async createPersonFingerPrint(
     createPersonFingerprintDto: CreatePersonFingerprintDto,
-  ): Promise<any> {
-    const { personId, quality, fingerprintTypeId, wsq } = createPersonFingerprintDto;
-    const buffer = Buffer.from(wsq, 'base64');
-    const [person, fingerprintType] = await Promise.all([
-      this.personRepository.findOne({ where: { id: personId } }),
-      this.fingerprintTypeRepository.findOne({ where: { id: fingerprintTypeId } }),
-    ]);
-    if (!person || !fingerprintType) {
-      throw new NotFoundException('Persona o tipo de huella no encontrado');
-    }
-    await this.ftp.connectToFtp();
-    const initialPath = `Person/Fingerprint/${personId}/`;
-    const path = `${initialPath}${fingerprintType.name}.wsq`;
-    const newPersonFingerprint = this.personFingerprintRepository.create({
-      person,
-      quality,
-      fingerprintType,
-      path,
-    });
-    await Promise.all([
-      this.personFingerprintRepository.save(newPersonFingerprint),
-      await this.ftp.uploadFile(buffer, initialPath, path),
-    ]);
-    await this.ftp.onDestroy();
-    return newPersonFingerprint;
+  ): Promise<{ message: string; registros: { success: string[]; error: string[] } }> {
+    const { personId, fingerprints } = createPersonFingerprintDto;
+    const person = await this.findOne(personId);
+    const uploadResults = await fingerprints.reduce(
+      async (accPromise, fingerprint) => {
+        const acc = await accPromise;
+        const { wsq, quality, fingerprintTypeId } = fingerprint;
+        const buffer = Buffer.from(wsq, 'base64');
+        let personFingerprint = await this.personFingerprintRepository.findOne({
+          where: { person: person, fingerprintType: { id: fingerprintTypeId } },
+          relations: ['fingerprintType'],
+        });
+        let fingerprintType;
+        if (personFingerprint) {
+          personFingerprint.quality = quality;
+          fingerprintType = personFingerprint.fingerprintType;
+        } else {
+          fingerprintType = await this.fingerprintTypeRepository.findOne({
+            where: { id: fingerprintTypeId },
+          });
+          if (!fingerprintType) {
+            throw new NotFoundException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
+          }
+          const initialPath = `Person/Fingerprint/${personId}/`;
+          const path = `${initialPath}${fingerprintType.name}.wsq`;
+          personFingerprint = this.personFingerprintRepository.create({
+            person,
+            quality,
+            fingerprintType,
+            path,
+          });
+        }
+        await this.personFingerprintRepository.save(personFingerprint);
+        const initialPath = `Person/Fingerprint/${personId}/`;
+        const path = `${initialPath}${personFingerprint.fingerprintType.name}.wsq`;
+        try {
+          await this.ftp.connectToFtp();
+          await this.ftp.uploadFile(buffer, initialPath, path);
+          await this.ftp.onDestroy();
+          acc.success.push(fingerprintType.name);
+        } catch (error) {
+          console.error(`Error uploading fingerprint with ID ${fingerprintTypeId}:`, error);
+          acc.error.push(fingerprintType.name);
+        }
+        return acc;
+      },
+      Promise.resolve({ success: [], error: [] }),
+    );
+    const successMessage = uploadResults.success.join(', ');
+    const message =
+      uploadResults.success.length > 0
+        ? `Las huellas: ${successMessage} se han registrado correctamente.`
+        : 'No se registró ninguna huella correctamente.';
+    return {
+      message,
+      registros: {
+        success: uploadResults.success,
+        error: uploadResults.error,
+      },
+    };
   }
 
   async showFingerprintRegistered(personId: number): Promise<any> {
