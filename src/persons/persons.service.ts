@@ -109,72 +109,68 @@ export class PersonsService {
   }
 
   async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
-    try {
-      const person = await this.findAndVerifyPersonWithRelations(
-        personId,
-        'personAffiliates',
-        'affiliates',
-        'type',
-      );
-      const {
-        createdAt,
-        updatedAt,
-        deletedAt,
-        uuidColumn,
-        cityBirthId,
-        pensionEntityId,
-        financialEntityId,
-        nua,
-        idPersonSenasir,
-        dateLastContribution,
-        personAffiliates,
-        ...dataPerson
-      } = person;
-      const personAffiliate = await Promise.all(
-        personAffiliates.map(async (personAffiliate) => {
-          const { kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
-            personAffiliate;
-          const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-            'createdAt',
-            'updatedAt',
-            'deletedAt',
-          ]);
-          return {
-            ...dataPersonAffiliate,
-            kinship,
-          };
-        }),
-      );
-      const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
-        this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
-          'secondShortened',
-          'thirdShortened',
-          'toBank',
-          'latitude',
-          'longitude',
-          'companyAddress',
-          'phonePrefix',
-          'companyPhones',
-          'companyCellphones',
-        ]),
-        this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne', ['type', 'isActive']),
-        this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne', [
+    const person = await this.findAndVerifyPersonWithRelations(
+      personId,
+      'personAffiliates',
+      'affiliates',
+      'type',
+    );
+    const {
+      createdAt,
+      updatedAt,
+      deletedAt,
+      uuidColumn,
+      cityBirthId,
+      pensionEntityId,
+      financialEntityId,
+      nua,
+      idPersonSenasir,
+      dateLastContribution,
+      personAffiliates,
+      ...dataPerson
+    } = person;
+    const personAffiliate = await Promise.all(
+      personAffiliates.map(async (personAffiliate) => {
+        const { kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
+          personAffiliate;
+        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
           'createdAt',
           'updatedAt',
-        ]),
-      ]);
-      const birthDateLiteral = format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es });
-      return {
-        ...dataPerson,
-        birthDateLiteral: birthDateLiteral,
-        personAffiliate,
-        cityBirth,
-        pensionEntity,
-        financialEntity,
-      };
-    } catch (error) {
-      throw new RpcException(error);
-    }
+          'deletedAt',
+        ]);
+        return {
+          ...dataPersonAffiliate,
+          kinship,
+        };
+      }),
+    );
+    const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
+      this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
+        'secondShortened',
+        'thirdShortened',
+        'toBank',
+        'latitude',
+        'longitude',
+        'companyAddress',
+        'phonePrefix',
+        'companyPhones',
+        'companyCellphones',
+      ]),
+      this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne', ['type', 'isActive']),
+      this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne', [
+        'createdAt',
+        'updatedAt',
+      ]),
+    ]);
+    const birthDateLiteral = format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es });
+    return {
+      ...dataPerson,
+      birthDateLiteral: birthDateLiteral,
+      personAffiliate,
+      cityBirth,
+      pensionEntity,
+      financialEntity,
+    };
   }
 
   async findAffiliteRelatedWithPerson(id: number): Promise<any> {
@@ -316,15 +312,20 @@ export class PersonsService {
     registration: string,
     field: string,
   ): Promise<Person | null> {
-    const person = await this.personRepository.findOne({
-      where: { id },
-      relations: [relation],
-    });
+    let person = null;
+    try {
+      person = await this.personRepository.findOne({
+        where: { id },
+        relations: [relation],
+      });
+    } catch (error) {
+      throw new RpcException({ message: error.message, code: 400 });
+    }
     if (!person) {
-      throw new NotFoundException(`Affiliate with ID: ${id} not found`);
+      throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
     }
     if (!person[relation]) {
-      throw new Error(`campo ${relation} no existe en person`);
+      throw new RpcException({ message: `campo ${relation} no existe en person`, code: 404 });
     }
     const filteredRelatedData = person[relation].filter(
       (related) => related[field] === registration,

@@ -1,7 +1,7 @@
 import { Catch, ArgumentsHost, ExceptionFilter, BadRequestException, Logger } from '@nestjs/common';
 
-//import { RpcException } from '@nestjs/microservices';
 import { throwError } from 'rxjs';
+import { ErrorDto } from '../dtos/error.dto';
 
 @Catch(BadRequestException)
 export class BadRequestCustomExceptionFilter implements ExceptionFilter {
@@ -11,14 +11,17 @@ export class BadRequestCustomExceptionFilter implements ExceptionFilter {
 
     const context = host.switchToRpc();
     const response: any = exception.getResponse();
-    const err = {
-      ...response,
-      data: context.getData(),
-      ...context.getContext(),
-    };
-    this.logger.error(err);
 
-    const error = err ?? 'Internal server error';
-    return throwError(() => error);
+    const error = new ErrorDto();
+    error.message = response.message;
+    error.statusCode = response.statusCode;
+    error.data = context.getData();
+    error.args = context.getContext().args?.filter((e) => {
+      if (e != null) return e;
+    });
+
+    this.logger.error(JSON.stringify(error));
+
+    return throwError(() => error ?? 'Internal server error');
   }
 }
