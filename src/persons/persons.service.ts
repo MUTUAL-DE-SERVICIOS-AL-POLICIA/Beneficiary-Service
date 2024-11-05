@@ -8,7 +8,7 @@ import {
 import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FingerprintType, Person, PersonFingerprint } from './entities';
+import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,6 +25,8 @@ export class PersonsService {
     private readonly personFingerprintRepository: Repository<PersonFingerprint>,
     @InjectRepository(FingerprintType)
     private readonly fingerprintTypeRepository: Repository<FingerprintType>,
+    @InjectRepository(PersonAffiliate)
+    private readonly personAffiliateRepository: Repository<PersonAffiliate>,
     private readonly nats: NatsService,
     private readonly ftp: FtpService,
   ) {}
@@ -70,9 +72,10 @@ export class PersonsService {
     };
   }
 
-  async findOne(idPerson: number): Promise<Person> {
+  async findOnePerson(idPerson: number): Promise<Person> {
     const person = await this.personRepository.findOne({
       where: { id: idPerson },
+      relations: ['personAffiliates', 'personFingerprints', 'personFingerprints.fingerprintType'],
     });
     if (!person) throw new NotFoundException(`Person with: ${idPerson} not found`);
     return person;
@@ -179,11 +182,52 @@ export class PersonsService {
     return personAffiliates;
   }
 
+  async showPersonsRelatedToAffiliate(id: number): Promise<any> {
+    const dependents = await this.personAffiliateRepository.find({
+      where: {
+        typeId: id,
+        type: 'persons',
+      },
+      relations: ['person'],
+    });
+    const personAffiliate = await Promise.all(
+      dependents.map(async (personAffiliate) => {
+        const { person, kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
+          personAffiliate;
+        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
+          'createdAt',
+          'updatedAt',
+          'deletedAt',
+        ]);
+        const personInfo = personAffiliate.person
+          ? {
+              full_name: [
+                personAffiliate.person.firstName,
+                personAffiliate.person.secondName,
+                personAffiliate.person.lastName,
+                personAffiliate.person.mothersLastName,
+              ]
+                .filter(Boolean)
+                .join(' '),
+              identityCard: personAffiliate.person.identityCard,
+            }
+          : null;
+
+        return {
+          ...dataPersonAffiliate,
+          kinship,
+          person: personInfo,
+        };
+      }),
+    );
+    return personAffiliate;
+  }
+
   async createPersonFingerPrint(
     createPersonFingerprintDto: CreatePersonFingerprintDto,
   ): Promise<{ message: string; registros: { success: string[]; error: string[] } }> {
     const { personId, fingerprints } = createPersonFingerprintDto;
-    const person = await this.findOne(personId);
+    const person = await this.findOnePerson(personId);
     const uploadResults = await fingerprints.reduce(
       async (accPromise, fingerprint) => {
         const acc = await accPromise;
