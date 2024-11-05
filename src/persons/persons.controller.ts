@@ -23,7 +23,7 @@ export class PersonsController {
 
   @MessagePattern('person.findOne')
   async findOne(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.findOne(id);
+    return this.personsService.findOnePerson(id);
   }
 
   @MessagePattern('person.update')
@@ -44,6 +44,11 @@ export class PersonsController {
   @MessagePattern('person.findAffiliteRelatedWithPerson')
   async findAffiliteRelatedWithPerson(@Payload('id', ParseIntPipe) id: number) {
     return this.personsService.findAffiliteRelatedWithPerson(id);
+  }
+
+  @MessagePattern('person.showPersonsRelatedToAffiliate')
+  async showPersonsRelatedToAffiliate(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.showPersonsRelatedToAffiliate(id);
   }
 
   @MessagePattern('person.createPersonFingerprint')
