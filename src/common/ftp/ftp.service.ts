@@ -62,6 +62,17 @@ export class FtpService {
     }
   }
 
+  async listFiles(path: string) {
+    try {
+      const remotePath = `${envsFtp.ftpRoot}${path}`;
+      const files = await this.client.list(remotePath);
+      return files;
+    } catch (error) {
+      this.logger.error('Failed to list files:', error);
+      throw new Error('Failed to list files');
+    }
+  }
+
   async onDestroy() {
     await this.client.close();
     this.logger.log('FTP connection closed');
