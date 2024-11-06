@@ -68,4 +68,9 @@ export class PersonsController {
   async showListFingerprint() {
     return this.personsService.showListFingerprint();
   }
+
+  @MessagePattern('person.getFingerprintComparison')
+  async getFingerprintComparison(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.getFingerprintComparison(id);
+  }
 }
