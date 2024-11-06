@@ -89,19 +89,22 @@ export class AffiliatesService {
 
     if (document.status === false)
       throw new NotFoundException('Servicio de documentos no disponible');
+
     let affiliateDocument: AffiliateDocument;
     let response: string;
+
     if (affiliate.affiliateDocuments.length === 0) {
       affiliateDocument = new AffiliateDocument();
       affiliateDocument.affiliate = affiliate;
       affiliateDocument.procedureDocumentId = procedureDocumentId;
-      affiliateDocument.path = `${initialPath}${document.name}.pdf`;
       response = 'Creado';
     } else {
       affiliateDocument = affiliate.affiliateDocuments[0];
       affiliateDocument.updatedAt = new Date();
       response = 'Actualizado';
     }
+
+    affiliateDocument.path = `${initialPath}${document.shortened ?? document.name}.pdf`;
 
     await Promise.all([
       this.affiliateDocumentsRepository.save(affiliateDocument),
