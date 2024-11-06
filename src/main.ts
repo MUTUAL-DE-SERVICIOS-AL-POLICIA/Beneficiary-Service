@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { envs } from './config';
+import { RpcCustomExceptionFilter, BadRequestCustomExceptionFilter } from './common';
 
 async function bootstrap() {
   const logger = new Logger('Main');
@@ -15,7 +16,7 @@ async function bootstrap() {
   });
 
   //app.setGlobalPrefix('api');
-
+  app.useGlobalFilters(new RpcCustomExceptionFilter(), new BadRequestCustomExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

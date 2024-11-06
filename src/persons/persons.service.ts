@@ -13,6 +13,7 @@ import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { FtpService, NatsService } from 'src/common';
+import { RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class PersonsService {
@@ -311,15 +312,20 @@ export class PersonsService {
     registration: string,
     field: string,
   ): Promise<Person | null> {
-    const person = await this.personRepository.findOne({
-      where: { id },
-      relations: [relation],
-    });
+    let person = null;
+    try {
+      person = await this.personRepository.findOne({
+        where: { id },
+        relations: [relation],
+      });
+    } catch (error) {
+      throw new RpcException({ message: error.message, code: 400 });
+    }
     if (!person) {
-      throw new NotFoundException(`Affiliate with ID: ${id} not found`);
+      throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
     }
     if (!person[relation]) {
-      throw new Error(`campo ${relation} no existe en person`);
+      throw new RpcException({ message: `campo ${relation} no existe en person`, code: 404 });
     }
     const filteredRelatedData = person[relation].filter(
       (related) => related[field] === registration,
