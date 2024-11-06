@@ -249,8 +249,8 @@ export class PersonsService {
           if (!fingerprintType) {
             throw new NotFoundException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
           }
-          const initialPath = `Person/Fingerprint/${personId}/`;
-          const path = `${initialPath}${fingerprintType.name}.wsq`;
+          const initialPath = `Person/Fingerprints/${personId}/`;
+          const path = `${initialPath}${fingerprintType.short_name}.wsq`;
           personFingerprint = this.personFingerprintRepository.create({
             person,
             quality,
@@ -259,8 +259,8 @@ export class PersonsService {
           });
         }
         await this.personFingerprintRepository.save(personFingerprint);
-        const initialPath = `Person/Fingerprint/${personId}/`;
-        const path = `${initialPath}${personFingerprint.fingerprintType.name}.wsq`;
+        const initialPath = `Person/Fingerprints/${personId}/`;
+        const path = `${initialPath}${personFingerprint.fingerprintType.short_name}.wsq`;
         try {
           await this.ftp.connectToFtp();
           await this.ftp.uploadFile(buffer, initialPath, path);
@@ -298,6 +298,39 @@ export class PersonsService {
       name: fingerprint.fingerprintType.name,
     }));
     return { fingerprints };
+  }
+
+  async getFingerprintComparison(personId: number): Promise<any> {
+    const person = await this.findOnePerson(personId);
+    if (person.personFingerprints.length === 0) {
+      throw new RpcException({
+        message: `Person with ID: ${personId} not found`,
+        code: 404,
+      });
+    }
+    const fingerprintsData = [];
+    try {
+      await this.ftp.connectToFtp();
+      for (const fingerprint of person.personFingerprints) {
+        try {
+          console.log(`Processing fingerprint ID: ${fingerprint.id}`);
+          const fileBuffer = await this.ftp.downloadFile(fingerprint.path);
+          const wsqBase64 = fileBuffer.toString('base64');
+          fingerprintsData.push({
+            id: fingerprint.id,
+            quality: fingerprint.quality,
+            fingerprintType: fingerprint.fingerprintType,
+            wsqBase64,
+          });
+        } catch (error) {
+          console.error(`Failed to download file at path: ${fingerprint.path}`, error);
+          throw new Error(`Failed to download file at path: ${fingerprint.path}`);
+        }
+      }
+    } finally {
+      await this.ftp.onDestroy();
+    }
+    return fingerprintsData;
   }
 
   private handleDBException(error: any) {
