@@ -175,39 +175,55 @@ export class AffiliatesService {
       }),
     ]);
 
-    if (modality.status === false) return modality;
+    if (!modality.status) return modality;
 
     const { affiliateDocuments } = affiliate;
     const { procedureRequirements } = modality;
 
-    if (!procedureRequirements.length)
+    if (!procedureRequirements.length) {
       return { status: false, message: 'No hay documentos requeridos' };
-
-    if (!affiliateDocuments.length) {
-      const collateDocuments = procedureRequirements.map((res) => ({
-        procedureRequirementId: res.id,
-        number: res.number,
-        procedureDocumentId: res.procedureDocument.id,
-        name: res.procedureDocument.name,
-        isUploaded: false,
-      }));
-      return { status: modality.status, collateDocuments };
     }
 
-    const affiliateDocumentsMap = new Map(
-      affiliateDocuments.map((doc) => [doc.procedureDocumentId, doc]),
-    );
+    const affiliateDocumentsSet = new Set(affiliateDocuments.map((doc) => doc.procedureDocumentId));
+    const requiredDocuments = new Map<number, any[]>();
+    const additionallyDocumentsUpload: any[] = [];
+    const additionallyDocuments: any[] = [];
 
-    const collateDocuments = procedureRequirements.map(({ procedureDocument, id, number }) => ({
-      procedureRequirementId: id,
-      number: number,
-      procedureDocumentId: procedureDocument.id,
-      name: procedureDocument.name,
-      shortened: procedureDocument.shortened,
-      isUploaded: affiliateDocumentsMap.has(procedureDocument.id),
-    }));
+    for (const { procedureDocument, id, number } of procedureRequirements) {
+      const documentData = {
+        procedureRequirementId: id,
+        number,
+        procedureDocumentId: procedureDocument.id,
+        name: procedureDocument.name,
+        shortened: procedureDocument.shortened,
+        isUploaded: affiliateDocumentsSet.has(procedureDocument.id),
+      };
 
-    return { status: modality.status, collateDocuments };
+      if (number === 0) {
+        (documentData.isUploaded ? additionallyDocumentsUpload : additionallyDocuments).push(
+          documentData,
+        );
+      } else {
+        if (!requiredDocuments.has(number)) {
+          requiredDocuments.set(number, []);
+        }
+        requiredDocuments.get(number)?.push(documentData);
+      }
+    }
+
+    requiredDocuments.forEach((docs, key) => {
+      requiredDocuments.set(
+        key,
+        docs.some((doc) => doc.isUploaded) ? [docs.find((doc) => doc.isUploaded)!] : docs,
+      );
+    });
+
+    return {
+      status: modality.status,
+      requiredDocuments: Object.fromEntries(requiredDocuments),
+      additionallyDocumentsUpload,
+      additionallyDocuments,
+    };
   }
 
   private async findAndVerifyAffiliateWithRelations(
