@@ -17,7 +17,6 @@ export class PersonsController {
 
   @MessagePattern('person.findAll')
   findAll(@Payload() filteredPaginationDto: FilteredPaginationDto) {
-    console.log(FilteredPaginationDto);
     return this.personsService.findAll(filteredPaginationDto);
   }
 
