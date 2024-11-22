@@ -73,12 +73,23 @@ export class PersonsService {
     };
   }
 
-  async findOnePerson(idPerson: number): Promise<Person> {
-    const person = await this.personRepository.findOne({
-      where: { id: idPerson },
-      relations: ['personAffiliates', 'personFingerprints', 'personFingerprints.fingerprintType'],
-    });
-    if (!person) throw new NotFoundException(`Person with: ${idPerson} not found`);
+  async findOnePerson(term: string): Promise<Person> {
+    const queryBuilder = this.personRepository.createQueryBuilder('person');
+    const person = await queryBuilder
+      .leftJoinAndSelect('person.personAffiliates', 'personAffiliates')
+      .leftJoinAndSelect('person.personFingerprints', 'personFingerprints')
+      .leftJoinAndSelect('personFingerprints.fingerprintType', 'fingerprintType')
+      .where('person.id = :id or person.identityCard = :identityCard', {
+        id: +term,
+        identityCard: term,
+      })
+      .getOne();
+    if (!person) {
+      throw new RpcException({
+        code: 404,
+        message: `Persona con ${term} no encontrada`,
+      });
+    }
     return person;
   }
 
@@ -228,7 +239,7 @@ export class PersonsService {
     createPersonFingerprintDto: CreatePersonFingerprintDto,
   ): Promise<{ message: string; registros: { success: string[]; error: string[] } }> {
     const { personId, fingerprints } = createPersonFingerprintDto;
-    const person = await this.findOnePerson(personId);
+    const person = await this.findOnePerson(`${personId}`);
     const uploadResults = await fingerprints.reduce(
       async (accPromise, fingerprint) => {
         const acc = await accPromise;
@@ -247,7 +258,7 @@ export class PersonsService {
             where: { id: fingerprintTypeId },
           });
           if (!fingerprintType) {
-            throw new NotFoundException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
+            throw new RpcException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
           }
           const initialPath = `Person/Fingerprints/${personId}/`;
           const path = `${initialPath}${fingerprintType.short_name}.wsq`;
@@ -301,7 +312,7 @@ export class PersonsService {
   }
 
   async getFingerprintComparison(personId: number): Promise<any> {
-    const person = await this.findOnePerson(personId);
+    const person = await this.findOnePerson(`${personId}`);
     if (person.personFingerprints.length === 0) {
       throw new RpcException({
         message: `Person with ID: ${personId} not found`,

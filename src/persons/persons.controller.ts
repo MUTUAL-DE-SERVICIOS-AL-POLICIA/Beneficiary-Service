@@ -17,13 +17,12 @@ export class PersonsController {
 
   @MessagePattern('person.findAll')
   findAll(@Payload() filteredPaginationDto: FilteredPaginationDto) {
-    console.log(FilteredPaginationDto);
     return this.personsService.findAll(filteredPaginationDto);
   }
 
   @MessagePattern('person.findOne')
-  async findOne(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.findOnePerson(id);
+  async findOne(@Payload('term') term: string) {
+    return this.personsService.findOnePerson(term);
   }
 
   @MessagePattern('person.update')
