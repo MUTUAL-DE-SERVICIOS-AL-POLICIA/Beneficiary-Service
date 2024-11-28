@@ -2,7 +2,6 @@ import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
 import { FtpService } from 'src/common';
 import * as readline from 'readline';
-import e from 'express';
 
 export class ImportRequirements1730293751153 implements Seeder {
   async promptUser(question: string): Promise<string> {
@@ -71,13 +70,13 @@ export class ImportRequirements1730293751153 implements Seeder {
     );
 
     for (const affiliateId of validAffiliates) {
-
       const pathFile = `${path}/${affiliateId.id}`;
 
       const files = await ftp.listFiles(pathFile);
       const documentsOriginal = files.map((file) => `'${file.name.replace(/"/g, '')}'`);
-      const documents = files.map((file) => `'${file.name.replace(/"/g, '').replace(/\.pdf$/i, '')}'`);
-
+      const documents = files.map(
+        (file) => `'${file.name.replace(/"/g, '').replace(/\.pdf$/i, '')}'`,
+      );
 
       if (documents.length != 0) {
         dataRead[affiliateId.id] = documentsOriginal;
@@ -100,7 +99,8 @@ export class ImportRequirements1730293751153 implements Seeder {
         });
       }
     }
-    let totalErrors:number = 0;
+    let totalErrors: number = 0;
+    let totalThumbs: number = 0;
     for (const affiliateId in dataRead) {
       dataValidReal[affiliateId] = [];
       const validDocsMap = dataValid[affiliateId];
@@ -115,14 +115,20 @@ export class ImportRequirements1730293751153 implements Seeder {
             path: doc.replace(/^'|'$/g, ''),
           });
         } else {
-          if (!initialFolder.dataErrorReadFiles[affiliateId]) {
-            initialFolder.dataErrorReadFiles[affiliateId] = [];
+          if (doc.replace(/^'|'$/g, '') != 'Thumbs.db') {
+            if (!initialFolder.dataErrorReadFiles[affiliateId]) {
+              initialFolder.dataErrorReadFiles[affiliateId] = [];
+            }
+            initialFolder.dataErrorReadFiles[affiliateId].push(doc.replace(/^'|'$/g, ''));
+            totalErrors++;
+          } else {
+            totalThumbs++;
           }
-          initialFolder.dataErrorReadFiles[affiliateId].push(doc.replace(/^'|'$/g, ''));
-          totalErrors++;
         }
       });
     }
+
+    initialFolder.filesValidFolder -= totalThumbs;
 
     await ftp.onDestroy();
     console.log('Lectura de carpetas:');
@@ -133,7 +139,7 @@ export class ImportRequirements1730293751153 implements Seeder {
     console.log('Archivos total de las carpetas validas', initialFolder.filesValidFolder);
     console.log('Archivos validos para subir', initialFolder.filesValid);
     //console.log('Archivos validos:', dataValidReal);
-    console.log('Numero de Archivos con errores:',totalErrors);
+    console.log('Numero de Archivos con errores:', totalErrors);
     //console.log('Archivos con errores:',initialFolder.dataErrorReadFiles);
     const answer = await this.promptUser('¿Deseas continuar? (y/n): ');
 
@@ -141,24 +147,25 @@ export class ImportRequirements1730293751153 implements Seeder {
       console.log('Abortando ejecución del seeder.');
       return;
     }
-    let cont:number = 0;
+    let cont: number = 0;
     await dataSource.transaction(async (transactionalEntityManager) => {
       const inserts = [];
       for (const affiliateId in dataValidReal) {
         for (const document of dataValidReal[affiliateId]) {
-          inserts.push(`(${affiliateId}, ${document.id}, '${path}/${affiliateId}/${document.path}')`);
+          inserts.push(
+            `(${affiliateId}, ${document.id}, '${path}/${affiliateId}/${document.path}')`,
+          );
           cont++;
         }
       }
-      
+
       if (inserts.length > 0) {
         await transactionalEntityManager.query(
-          `INSERT INTO beneficiaries.affiliate_documents (affiliate_id, procedure_document_id, path) VALUES ${inserts.join(',')}`
+          `INSERT INTO beneficiaries.affiliate_documents (affiliate_id, procedure_document_id, path) VALUES ${inserts.join(',')}`,
         );
       }
       console.log(`Todas las inserciones,${cont} se completaron exitosamente en una transacción.`);
     });
-    
   }
 }
 
