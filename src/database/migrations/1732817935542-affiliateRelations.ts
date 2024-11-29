@@ -14,7 +14,7 @@ export class affiliateRelations1732817935542 implements MigrationInterface {
       }),
     );
 
-     // Crear la llave foránea entre affiliate_states y state type
+    // Crear la llave foránea entre affiliate_states y state type
     await queryRunner.createForeignKey(
       'beneficiaries.affiliate_states',
       new TableForeignKey({
@@ -57,7 +57,5 @@ export class affiliateRelations1732817935542 implements MigrationInterface {
       'beneficiaries.affiliate_documents',
       'FK_affiliate_documents_affiliates', // Utiliza el nombre explícito definido al crear
     );
-
-
   }
 }
