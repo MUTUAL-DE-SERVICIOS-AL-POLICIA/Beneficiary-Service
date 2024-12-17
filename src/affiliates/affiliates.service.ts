@@ -1,8 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginationDto, FtpService, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
 import { Affiliate, AffiliateDocument } from './entities';
+import { RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class AffiliatesService {
@@ -29,7 +30,7 @@ export class AffiliatesService {
   async findOne(id: number) {
     const affiliate = await this.affiliateRepository.findOneBy({ id });
 
-    if (!affiliate) throw new NotFoundException(`Affiliate with: ${id} not found`);
+    if (!affiliate) throw new RpcException({ message: `Affiliate with: ${id} not found`, code: 404 });
     return affiliate;
   }
 
@@ -88,7 +89,7 @@ export class AffiliatesService {
     const initialPath = `Affiliate/Documents/${affiliateId}/`;
 
     if (document.status === false)
-      throw new NotFoundException('Servicio de documentos no disponible');
+      throw new RpcException({message: 'Servicio de documentos no disponible', code: 400});
 
     let affiliateDocument: AffiliateDocument;
     let response: string;
@@ -154,7 +155,7 @@ export class AffiliatesService {
 
     const documents = affiliate.affiliateDocuments;
 
-    if (documents.length === 0) throw new NotFoundException('Document not found');
+    if (documents.length === 0) throw new RpcException({message: 'Document not found', code: 404});
 
     const firstDocument = documents[0];
 
@@ -235,7 +236,7 @@ export class AffiliatesService {
       relations: relations.length > 0 ? relations : [],
     });
     if (!affiliate) {
-      throw new NotFoundException(`Affiliate with ID: ${id} not found`);
+      throw new RpcException({message: `Affiliate with ID: ${id} not found`, code: 404});
     }
     return affiliate;
   }
@@ -255,7 +256,7 @@ export class AffiliatesService {
       .getOne();
 
     if (!affiliate) {
-      throw new NotFoundException(`Affiliate not found with ID ${id}`);
+      throw new RpcException({message: `Affiliate with ID: ${id} not found`, code: 404});
     }
     return affiliate;
   }

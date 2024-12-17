@@ -27,3 +27,5 @@ export class CreateFingerprintsTypes implements Seeder {
     ]);
   }
 }
+
+//yarn seed:run --name src/database/seeds/1729535116092-create_fingerprints_types.ts
