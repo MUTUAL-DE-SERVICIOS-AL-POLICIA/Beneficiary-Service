@@ -11,6 +11,8 @@ COPY . .
 
 RUN yarn run build
 
+RUN yarn migration:run
+
 CMD ["node", "dist/main.js"]
 
 # docker build -f dockerfile.prod -t beneficiary-microservice .
