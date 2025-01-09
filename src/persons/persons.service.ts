@@ -246,13 +246,14 @@ export class PersonsService {
         const { wsq, quality, fingerprintTypeId } = fingerprint;
         const buffer = Buffer.from(wsq, 'base64');
         let personFingerprint = await this.personFingerprintRepository.findOne({
-          where: { person: person, fingerprintType: { id: fingerprintTypeId } },
+          where: { person: { id: personId }, fingerprintType: { id: fingerprintTypeId } },
           relations: ['fingerprintType'],
         });
         let fingerprintType;
         if (personFingerprint) {
           personFingerprint.quality = quality;
           fingerprintType = personFingerprint.fingerprintType;
+          personFingerprint.updatedAt = new Date();
         } else {
           fingerprintType = await this.fingerprintTypeRepository.findOne({
             where: { id: fingerprintTypeId },
