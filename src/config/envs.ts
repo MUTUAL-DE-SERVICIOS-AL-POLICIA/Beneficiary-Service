@@ -2,7 +2,6 @@ import 'dotenv/config';
 import * as joi from 'joi';
 
 interface EnvVars {
-  PORT: number;
   NATS_SERVERS: string[];
   DB_PASSWORD: string;
   DB_DATABASE: string;
@@ -20,12 +19,8 @@ interface EnvVars {
 
 const envsSchema = joi
   .object({
-    PORT: joi.number().required(),
     NATS_SERVERS: joi.array().items(joi.string()).required(),
-    DB_SYNCHRONIZE: joi
-      .string()
-      .valid('true', 'false')
-      .default('false'),
+    DB_SYNCHRONIZE: joi.string().valid('true', 'false').default('false'),
   })
   .unknown(true);
 
@@ -42,10 +37,6 @@ if (error) {
 const envVars: EnvVars = {
   ...value,
   DB_SYNCHRONIZE: value.DB_SYNCHRONIZE === 'true',
-};
-
-export const PortEnvs = {
-  port: envVars.PORT,
 };
 
 export const NastEnvs = {
@@ -69,4 +60,3 @@ export const envsFtp = {
   ftpRoot: envVars.FTP_ROOT,
   ftpSsl: envVars.FTP_SSL,
 };
-
