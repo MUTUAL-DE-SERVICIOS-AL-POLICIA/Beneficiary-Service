@@ -62,6 +62,17 @@ export class FtpService {
     }
   }
 
+  async removeFile(path: string) {
+    try {
+      const remoteFilePath = `${envsFtp.ftpRoot}${path}`;
+      await this.client.remove(remoteFilePath);
+      this.logger.log('File removed successfully');
+    } catch (error) {
+      this.logger.error('Failed to remove file:', error);
+      throw new Error('Failed to remove file');
+    }
+  }
+
   async listFiles(path: string) {
     try {
       const remotePath = `${envsFtp.ftpRoot}${path}`;
