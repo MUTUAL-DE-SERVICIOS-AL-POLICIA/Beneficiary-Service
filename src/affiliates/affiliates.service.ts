@@ -30,7 +30,8 @@ export class AffiliatesService {
   async findOne(id: number) {
     const affiliate = await this.affiliateRepository.findOneBy({ id });
 
-    if (!affiliate) throw new RpcException({ message: `Affiliate with: ${id} not found`, code: 404 });
+    if (!affiliate)
+      throw new RpcException({ message: `Affiliate with: ${id} not found`, code: 404 });
     return affiliate;
   }
 
@@ -89,7 +90,7 @@ export class AffiliatesService {
     const initialPath = `Affiliate/Documents/${affiliateId}/`;
 
     if (document.status === false)
-      throw new RpcException({message: 'Servicio de documentos no disponible', code: 400});
+      throw new RpcException({ message: 'Servicio de documentos no disponible', code: 400 });
 
     let affiliateDocument: AffiliateDocument;
     let response: string;
@@ -155,7 +156,8 @@ export class AffiliatesService {
 
     const documents = affiliate.affiliateDocuments;
 
-    if (documents.length === 0) throw new RpcException({message: 'Document not found', code: 404});
+    if (documents.length === 0)
+      throw new RpcException({ message: 'Document not found', code: 404 });
 
     const firstDocument = documents[0];
 
@@ -236,7 +238,7 @@ export class AffiliatesService {
       relations: relations.length > 0 ? relations : [],
     });
     if (!affiliate) {
-      throw new RpcException({message: `Affiliate with ID: ${id} not found`, code: 404});
+      throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
     }
     return affiliate;
   }
@@ -256,7 +258,7 @@ export class AffiliatesService {
       .getOne();
 
     if (!affiliate) {
-      throw new RpcException({message: `Affiliate with ID: ${id} not found`, code: 404});
+      throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
     }
     return affiliate;
   }
