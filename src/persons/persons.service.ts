@@ -239,7 +239,12 @@ export class PersonsService {
     createPersonFingerprintDto: CreatePersonFingerprintDto,
   ): Promise<{ message: string; registros: { success: string[]; error: string[] } }> {
     const { personId, fingerprints } = createPersonFingerprintDto;
-    const person = await this.findOnePerson(`${personId}`);
+
+    const [person] = await Promise.all([
+      this.findOnePerson(`${personId}`),
+      this.ftp.connectToFtp(),
+    ]);
+
     const uploadResults = await fingerprints.reduce(
       async (accPromise, fingerprint) => {
         const acc = await accPromise;
@@ -250,10 +255,14 @@ export class PersonsService {
           relations: ['fingerprintType'],
         });
         let fingerprintType;
+        const initialPath = `Person/Fingerprints/${personId}/`;
         if (personFingerprint) {
-          personFingerprint.quality = quality;
           fingerprintType = personFingerprint.fingerprintType;
-          personFingerprint.updatedAt = new Date();
+          if (quality > personFingerprint.quality) {
+            personFingerprint.quality = quality;
+            personFingerprint.updatedAt = new Date();
+          }
+          personFingerprint.attempts += 1;
         } else {
           fingerprintType = await this.fingerprintTypeRepository.findOne({
             where: { id: fingerprintTypeId },
@@ -261,7 +270,6 @@ export class PersonsService {
           if (!fingerprintType) {
             throw new RpcException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
           }
-          const initialPath = `Person/Fingerprints/${personId}/`;
           const path = `${initialPath}${fingerprintType.short_name}.wsq`;
           personFingerprint = this.personFingerprintRepository.create({
             person,
@@ -271,12 +279,31 @@ export class PersonsService {
           });
         }
         await this.personFingerprintRepository.save(personFingerprint);
-        const initialPath = `Person/Fingerprints/${personId}/`;
-        const path = `${initialPath}${personFingerprint.fingerprintType.short_name}.wsq`;
+        const path = `${initialPath}${personFingerprint.fingerprintType.short_name}_${quality}.wsq`;
         try {
-          await this.ftp.connectToFtp();
-          await this.ftp.uploadFile(buffer, initialPath, path);
-          await this.ftp.onDestroy();
+          if (personFingerprint.attempts > 3) {
+            const files = await this.ftp.listFiles(initialPath);
+            let quality_exist = false;
+            const smallestNumber = files
+              .filter((file) => file.name.includes(personFingerprint.fingerprintType.short_name))
+              .map((file) => {
+                const match = file.name.match(/\d+/);
+                const number = match ? parseInt(match[0], 10) : null;
+                if (number === quality) {
+                  quality_exist = true;
+                }
+                return number;
+              })
+              .filter(Boolean)
+              .reduce((min, num) => (num < min ? num : min), Infinity);
+            if (smallestNumber < quality && !quality_exist) {
+              const remove_path = `${initialPath}${personFingerprint.fingerprintType.short_name}_${smallestNumber}.wsq`;
+              await this.ftp.removeFile(remove_path);
+              await this.ftp.uploadFile(buffer, initialPath, path);
+            }
+          } else {
+            await this.ftp.uploadFile(buffer, initialPath, path);
+          }
           acc.success.push(fingerprintType.name);
         } catch (error) {
           console.error(`Error uploading fingerprint with ID ${fingerprintTypeId}:`, error);
@@ -287,10 +314,14 @@ export class PersonsService {
       Promise.resolve({ success: [], error: [] }),
     );
     const successMessage = uploadResults.success.join(', ');
-    const message =
+
+    const [message] = await Promise.all([
       uploadResults.success.length > 0
         ? `Las huellas: ${successMessage} se han registrado correctamente.`
-        : 'No se registró ninguna huella correctamente.';
+        : 'No se registró ninguna huella correctamente.',
+      await this.ftp.onDestroy(),
+    ]);
+
     return {
       message,
       registros: {
