@@ -73,21 +73,18 @@ export class PersonsService {
     };
   }
 
-  async findOnePerson(term: string): Promise<Person> {
+  async findOnePerson(term: string, field: string): Promise<Person> {
     const queryBuilder = this.personRepository.createQueryBuilder('person');
     const person = await queryBuilder
       .leftJoinAndSelect('person.personAffiliates', 'personAffiliates')
       .leftJoinAndSelect('person.personFingerprints', 'personFingerprints')
       .leftJoinAndSelect('personFingerprints.fingerprintType', 'fingerprintType')
-      .where('person.id = :id or person.identityCard = :identityCard', {
-        id: +term,
-        identityCard: term,
-      })
+      .where(`person.${field} = :value`, { value: field === 'id' ? +term : term })
       .getOne();
     if (!person) {
       throw new RpcException({
         code: 404,
-        message: `Persona con ${term} no encontrada`,
+        message: `Persona: ${term} no encontrada`,
       });
     }
     return person;
@@ -241,7 +238,7 @@ export class PersonsService {
     const { personId, fingerprints } = createPersonFingerprintDto;
 
     const [person] = await Promise.all([
-      this.findOnePerson(`${personId}`),
+      this.findOnePerson(`${personId}`, 'id'),
       this.ftp.connectToFtp(),
     ]);
 
@@ -344,7 +341,7 @@ export class PersonsService {
   }
 
   async getFingerprintComparison(personId: number): Promise<any> {
-    const person = await this.findOnePerson(`${personId}`);
+    const person = await this.findOnePerson(`${personId}`, 'id');
     if (person.personFingerprints.length === 0) {
       throw new RpcException({
         message: `Person with ID: ${personId} not found`,
