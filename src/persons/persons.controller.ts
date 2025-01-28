@@ -22,7 +22,7 @@ export class PersonsController {
 
   @MessagePattern('person.findOne')
   async findOne(@Payload('term') term: string) {
-    return this.personsService.findOnePerson(term);
+    return this.personsService.findOnePerson(term, 'id');
   }
 
   @MessagePattern('person.update')
