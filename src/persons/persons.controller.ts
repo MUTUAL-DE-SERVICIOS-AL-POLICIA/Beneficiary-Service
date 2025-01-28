@@ -21,8 +21,8 @@ export class PersonsController {
   }
 
   @MessagePattern('person.findOne')
-  async findOne(@Payload('term') term: string) {
-    return this.personsService.findOnePerson(term, 'id');
+  async findOne(@Payload('term') term: string, @Payload('field') field: string) {
+    return this.personsService.findOnePerson(term, field);
   }
 
   @MessagePattern('person.update')
