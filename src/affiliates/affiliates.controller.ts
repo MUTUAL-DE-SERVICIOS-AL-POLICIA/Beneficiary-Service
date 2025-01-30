@@ -54,4 +54,11 @@ export class AffiliatesController {
   ) {
     return this.affiliatesService.collateDocuments(affiliateId, modalityId);
   }
+
+  @MessagePattern('affiliate.documentsAnalysis')
+  documentsAnalysis(@Payload() payload: { path: string; user: string; pass: string }) {
+    const { path, user, pass } = payload;
+    return this.affiliatesService.documentsAnalysis(path, user, pass);
+  }
+
 }
