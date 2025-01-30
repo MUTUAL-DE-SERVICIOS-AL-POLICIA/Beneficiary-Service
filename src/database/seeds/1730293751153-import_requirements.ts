@@ -115,7 +115,10 @@ export class ImportRequirements1730293751153 implements Seeder {
             path: doc.replace(/^'|'$/g, ''),
           });
         } else {
-          if (doc.replace(/^'|'$/g, '') != 'Thumbs.db') {
+          if (
+            doc.replace(/^'|'$/g, '') != 'Thumbs.db' &&
+            doc.replace(/^'|'$/g, '') != 'desktop.ini'
+          ) {
             if (!initialFolder.dataErrorReadFiles[affiliateId]) {
               initialFolder.dataErrorReadFiles[affiliateId] = [];
             }
@@ -140,7 +143,7 @@ export class ImportRequirements1730293751153 implements Seeder {
     console.log('Archivos validos para subir', initialFolder.filesValid);
     //console.log('Archivos validos:', dataValidReal);
     console.log('Numero de Archivos con errores:', totalErrors);
-    //console.log('Archivos con errores:',initialFolder.dataErrorReadFiles);
+    console.log('Archivos con errores:', initialFolder.dataErrorReadFiles);
     const answer = await this.promptUser('¿Deseas continuar? (y/n): ');
 
     if (answer.toLowerCase() !== 'y') {
