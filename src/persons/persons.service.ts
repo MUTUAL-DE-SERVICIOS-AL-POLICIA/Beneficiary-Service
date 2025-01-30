@@ -81,6 +81,8 @@ export class PersonsService {
       .leftJoinAndSelect('personFingerprints.fingerprintType', 'fingerprintType')
       .where(`person.${field} = :value`, { value: field === 'id' ? +term : term })
       .getOne();
+    console.log(term);
+    console.log('field', field);
     if (!person) {
       throw new RpcException({
         code: 404,
@@ -247,78 +249,69 @@ export class PersonsService {
         const acc = await accPromise;
         const { wsq, quality, fingerprintTypeId } = fingerprint;
         const buffer = Buffer.from(wsq, 'base64');
-        let personFingerprint = await this.personFingerprintRepository.findOne({
+        const personFingerprints = await this.personFingerprintRepository.find({
           where: { person: { id: personId }, fingerprintType: { id: fingerprintTypeId } },
           relations: ['fingerprintType'],
         });
-        let fingerprintType;
         const initialPath = `Person/Fingerprints/${personId}/`;
-        if (personFingerprint) {
-          fingerprintType = personFingerprint.fingerprintType;
-          if (quality > personFingerprint.quality) {
-            personFingerprint.quality = quality;
-            personFingerprint.updatedAt = new Date();
-          }
-          personFingerprint.attempts += 1;
-        } else {
-          fingerprintType = await this.fingerprintTypeRepository.findOne({
+        const existingFingerprint = personFingerprints.find((fp) => fp.quality === quality);
+        if (existingFingerprint) {
+          acc.error.push(`Ya existe una huella con calidad ${quality}, no se subirá nuevamente.`);
+          return acc;
+        }
+        if (personFingerprints.length < 3) {
+          const fingerprintType = await this.fingerprintTypeRepository.findOne({
             where: { id: fingerprintTypeId },
           });
           if (!fingerprintType) {
             throw new RpcException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
           }
-          const path = `${initialPath}${fingerprintType.short_name}.wsq`;
-          personFingerprint = this.personFingerprintRepository.create({
+          const path = `${initialPath}${fingerprintType.short_name}_${quality}.wsq`;
+          await this.ftp.uploadFile(buffer, initialPath, path);
+          const newPersonFingerprint = this.personFingerprintRepository.create({
             person,
             quality,
             fingerprintType,
             path,
           });
+          await this.personFingerprintRepository.save(newPersonFingerprint);
+          acc.success.push(`Huella registrada con calidad ${quality}: ${path}`);
+          return acc;
         }
-        await this.personFingerprintRepository.save(personFingerprint);
-        const path = `${initialPath}${personFingerprint.fingerprintType.short_name}_${quality}.wsq`;
-        try {
-          if (personFingerprint.attempts > 3) {
-            const files = await this.ftp.listFiles(initialPath);
-            let quality_exist = false;
-            const smallestNumber = files
-              .filter((file) => file.name.includes(personFingerprint.fingerprintType.short_name))
-              .map((file) => {
-                const match = file.name.match(/\d+/);
-                const number = match ? parseInt(match[0], 10) : null;
-                if (number === quality) {
-                  quality_exist = true;
-                }
-                return number;
-              })
-              .filter(Boolean)
-              .reduce((min, num) => (num < min ? num : min), Infinity);
-            if (smallestNumber < quality && !quality_exist) {
-              const remove_path = `${initialPath}${personFingerprint.fingerprintType.short_name}_${smallestNumber}.wsq`;
-              await this.ftp.removeFile(remove_path);
-              await this.ftp.uploadFile(buffer, initialPath, path);
-            }
-          } else {
-            await this.ftp.uploadFile(buffer, initialPath, path);
-          }
-          acc.success.push(fingerprintType.name);
-        } catch (error) {
-          console.error(`Error uploading fingerprint with ID ${fingerprintTypeId}:`, error);
-          acc.error.push(fingerprintType.name);
+        const fingerprintMinQuality = personFingerprints.reduce(
+          (min, current) => (current.quality < min.quality ? current : min),
+          personFingerprints[0],
+        );
+        if (quality > fingerprintMinQuality.quality) {
+          const remove_path = fingerprintMinQuality.path;
+          const fingerprintType = fingerprintMinQuality.fingerprintType;
+          fingerprintMinQuality.quality = quality;
+          fingerprintMinQuality.path = `${initialPath}${fingerprintType.short_name}_${quality}.wsq`;
+          fingerprintMinQuality.updatedAt = new Date();
+          await this.ftp.removeFile(remove_path);
+          await this.ftp.uploadFile(buffer, initialPath, fingerprintMinQuality.path);
+          await this.personFingerprintRepository.save(fingerprintMinQuality);
+          acc.success.push(
+            `Huella reemplazada con calidad ${quality}: ${fingerprintMinQuality.path}`,
+          );
+        } else {
+          acc.error.push(
+            `La calidad ${quality} no es suficiente para reemplazar la huella de menor calidad.`,
+          );
         }
         return acc;
       },
       Promise.resolve({ success: [], error: [] }),
     );
-    const successMessage = uploadResults.success.join(', ');
-
-    const [message] = await Promise.all([
-      uploadResults.success.length > 0
-        ? `Las huellas: ${successMessage} se han registrado correctamente.`
-        : 'No se registró ninguna huella correctamente.',
-      await this.ftp.onDestroy(),
-    ]);
-
+    let message = '';
+    if (uploadResults.success.length > 0 && uploadResults.error.length > 0) {
+      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente.`;
+    } else if (uploadResults.success.length > 0) {
+      message = `Las huellas se han registrado correctamente.`;
+    } else {
+      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente.`;
+    }
+    await this.ftp.onDestroy();
     return {
       message,
       registros: {
