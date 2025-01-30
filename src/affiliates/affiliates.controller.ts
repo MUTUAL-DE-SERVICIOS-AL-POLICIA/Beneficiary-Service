@@ -61,4 +61,8 @@ export class AffiliatesController {
     return this.affiliatesService.documentsAnalysis(path, user, pass);
   }
 
+  @MessagePattern('affiliate.documentsImports')
+  documentsImports(@Payload() payload: object) {
+    return this.affiliatesService.documentsImports(payload);
+  }
 }
