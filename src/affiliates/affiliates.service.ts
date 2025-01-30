@@ -4,6 +4,7 @@ import { PaginationDto, FtpService, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
 import { Affiliate, AffiliateDocument } from './entities';
 import { RpcException } from '@nestjs/microservices';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class AffiliatesService {
@@ -16,6 +17,7 @@ export class AffiliatesService {
     private readonly affiliateDocumentsRepository: Repository<AffiliateDocument>,
     private readonly ftp: FtpService,
     private readonly nats: NatsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   findAll(paginationDto: PaginationDto) {
@@ -227,6 +229,184 @@ export class AffiliatesService {
       additionallyDocumentsUpload,
       additionallyDocuments,
     };
+  }
+
+  async documentsAnalysis(path: string, user: string, pass: string): Promise<any> {
+    const key = await this.nats.firstValue('auth.login', { username: user, password: pass });
+    const pathFtp = 'Affiliate/Documents';
+
+    if (!key.status) {
+      throw new RpcException({ message: 'Credenciales incorrectas', code: 401 });
+    }
+
+    const initialFolder: {
+      totalFolder: number;
+      readFolder: number;
+      nonNumericIds: any;
+      validFolder: number;
+      dataErrorReadFolder: any;
+      filesValidFolder: number;
+      filesValid: number;
+      dataErrorReadFiles: any;
+      dataValidRealExist: any;
+      dataValidRealNotExist: any;
+    } = {
+      totalFolder: 0,
+      readFolder: 0,
+      nonNumericIds: {},
+      validFolder: 0,
+      dataErrorReadFolder: {},
+      filesValidFolder: 0,
+      filesValid: 0,
+      dataErrorReadFiles: {},
+      dataValidRealExist: [],
+      dataValidRealNotExist: {},
+    };
+
+    const dataRead = {};
+    const dataValid = {};
+    const dataValidReal = [];
+
+    await this.ftp.connectToFtp();
+    const { affiliateIds, nonNumericIds } = (await this.ftp.listFiles(path)).reduce(
+      (result, file) => {
+        const isOnlyNumbers = file.name.match(/^\d+$/);
+        if (isOnlyNumbers) {
+          result.affiliateIds.push(Number(file.name));
+        } else {
+          result.nonNumericIds.push(file.name);
+        }
+        return result;
+      },
+      { affiliateIds: [], nonNumericIds: [] },
+    );
+
+    if (affiliateIds.length === 0) {
+      throw new RpcException({ message: 'Ninguna Carpeta es Válida', code: 404 });
+    }
+
+    const validAffiliates = await this.dataSource.query(`
+      SELECT id FROM beneficiaries.affiliates WHERE id IN (${affiliateIds.join(',')})
+    `);
+
+    if (validAffiliates.length === 0) {
+      throw new RpcException({ message: 'Ninguna Carpeta es Válida', code: 404 });
+    }
+
+    initialFolder.totalFolder = affiliateIds.length + nonNumericIds.length;
+    initialFolder.readFolder = affiliateIds.length;
+    initialFolder.nonNumericIds = nonNumericIds;
+    initialFolder.validFolder = validAffiliates.length;
+    initialFolder.dataErrorReadFolder = affiliateIds.filter(
+      (item) => !new Set(validAffiliates.map((item) => Number(item.id))).has(item),
+    );
+
+    let notExistFiles = true;
+
+    for (const affiliateId of validAffiliates) {
+      const pathFile = `${path}/${affiliateId.id}`;
+
+      const files = await this.ftp.listFiles(pathFile);
+      const documentsOriginal = files.map((file) => `'${file.name.replace(/"/g, '')}'`);
+      const documents = files.map(
+        (file) => `'${file.name.replace(/"/g, '').replace(/\.pdf$/i, '')}'`,
+      );
+      if (documents.length != 0) {
+        dataRead[affiliateId.id] = documentsOriginal;
+        initialFolder.filesValidFolder += documents.length;
+
+        const validDocuments = await this.dataSource.query(
+          `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`,
+        );
+
+        if (validDocuments.length !== 0) {
+          notExistFiles = false;
+        }
+
+        initialFolder.filesValid += validDocuments.length;
+
+        dataValid[affiliateId.id] = {};
+        validDocuments.forEach((doc) => {
+          const shortened = doc.shortened;
+          dataValid[affiliateId.id][shortened] = doc;
+        });
+      }
+    }
+
+    if (notExistFiles) {
+      throw new RpcException({ message: 'No existen Archivos en las Carpetas', code: 404 });
+    }
+
+    await this.ftp.onDestroy();
+
+    let totalThumbs: number = 0;
+
+    for (const affiliateId in dataRead) {
+      const validDocsMap = dataValid[affiliateId];
+      dataRead[affiliateId].forEach((doc) => {
+        const cleanedDoc = doc.replace(/^'|'$/g, '').replace(/\.[^.]+$/, '');
+        const validDoc = validDocsMap[cleanedDoc];
+
+        if (validDoc) {
+          const short = `${doc.replace(/^'|'$/g, '')}`;
+          dataValidReal.push({
+            affiliate_id: affiliateId,
+            procedure_document_id: validDoc.id,
+            shortened: short,
+            oldPath: `${path}/${affiliateId}/${short}`,
+            newPath: `${pathFtp}/${affiliateId}/${short}`,
+          });
+        } else {
+          if (
+            doc.replace(/^'|'$/g, '') !== 'Thumbs.db' &&
+            doc.replace(/^'|'$/g, '') !== 'desktop.ini'
+          ) {
+            if (!initialFolder.dataErrorReadFiles[affiliateId]) {
+              initialFolder.dataErrorReadFiles[affiliateId] = [];
+            }
+            initialFolder.dataErrorReadFiles[affiliateId].push(doc.replace(/^'|'$/g, ''));
+          } else {
+            totalThumbs++;
+          }
+        }
+      });
+    }
+
+    initialFolder.filesValidFolder -= totalThumbs;
+
+    const values = dataValidReal
+      .map((doc) => `(${doc.affiliate_id}, ${doc.procedure_document_id})`)
+      .join(', ');
+
+    const dataExist = await this.dataSource.query(`
+      SELECT affiliate_id, procedure_document_id, path
+      FROM beneficiaries.affiliate_documents
+      WHERE (affiliate_id, procedure_document_id) IN (${values});
+    `);
+
+    const existingSet = new Set(
+      dataExist.map(
+        ({ affiliate_id, procedure_document_id }) => `${affiliate_id}-${procedure_document_id}`,
+      ),
+    );
+
+    const [dataNotExist, dataYesExist] = dataValidReal.reduce(
+      ([notExist, yesExist], doc) => {
+        const key = `${doc.affiliate_id}-${doc.procedure_document_id}`;
+        return existingSet.has(key)
+          ? [notExist, [...yesExist, doc]]
+          : [[...notExist, doc], yesExist];
+      },
+      [[], []] as [
+        { affiliate_id: string; procedure_document_id: string }[],
+        { affiliate_id: string; procedure_document_id: string }[],
+      ],
+    );
+
+    initialFolder.dataValidRealExist = dataYesExist;
+    initialFolder.dataValidRealNotExist = dataNotExist;
+
+    return initialFolder;
   }
 
   private async findAndVerifyAffiliateWithRelations(
