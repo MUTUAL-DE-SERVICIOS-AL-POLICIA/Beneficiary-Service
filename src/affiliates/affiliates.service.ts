@@ -409,6 +409,61 @@ export class AffiliatesService {
     return initialFolder;
   }
 
+  async documentsImports(data: any): Promise<any> {
+    await this.ftp.connectToFtp();
+    const Archivos_validos_reales_Existentes = data.dataValidRealExist;
+    const Archivos_validos_reales_No_Existentes = data.dataValidRealNotExist;
+
+    let contNewFiles = 0;
+    let contExistFiles = 0;
+
+    await this.dataSource.transaction(async (transactionalEntityManager) => {
+      const insertsNew: string[] = [];
+      try {
+        for (const file of Archivos_validos_reales_No_Existentes) {
+          await this.ftp.renameFile(file.oldPath, file.newPath);
+          insertsNew.push(
+            `(${file.affiliate_id}, ${file.procedure_document_id}, '${file.newPath}')`,
+          );
+          contNewFiles++;
+        }
+
+        if (insertsNew.length > 0) {
+          const queryNew = `
+            INSERT INTO beneficiaries.affiliate_documents (affiliate_id, procedure_document_id, path)
+            VALUES ${insertsNew.join(',')}`;
+          await transactionalEntityManager.query(queryNew);
+        }
+
+        for (const file of Archivos_validos_reales_Existentes) {
+          await this.ftp.renameFile(file.oldPath, file.newPath);
+
+          const queryExist = `
+            UPDATE beneficiaries.affiliate_documents
+            SET updated_at = NOW(), path = '${file.newPath}'
+            WHERE affiliate_id = ${file.affiliate_id} AND procedure_document_id = ${file.procedure_document_id}`;
+          await transactionalEntityManager.query(queryExist);
+
+          contExistFiles++;
+        }
+      } catch (error) {
+        throw new RpcException({ message: 'Ya se realizo la importación', code: 404 });
+      }
+
+      this.logger.log(`Archivos nuevos procesados: ${contNewFiles}`);
+      this.logger.log(`Archivos existentes actualizados: ${contExistFiles}`);
+    });
+
+    await this.ftp.onDestroy();
+
+    return {
+      totalFolder: data.totalFolder,
+      newFiles: contNewFiles,
+      updateFIles: contExistFiles,
+      totalFiles: contNewFiles + contExistFiles,
+    };
+  }
+
   private async findAndVerifyAffiliateWithRelations(
     id: number,
     relations: string[] = [],
