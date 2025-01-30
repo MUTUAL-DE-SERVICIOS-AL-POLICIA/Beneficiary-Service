@@ -73,14 +73,33 @@ export class FtpService {
     }
   }
 
-  async listFiles(path: string) {
+  async listFiles(path: string, key?: boolean) {
     try {
-      const remotePath = `${envsFtp.ftpRoot}${path}`;
+      const remotePath = key ? `${path}` : `${envsFtp.ftpRoot}${path}`;
       const files = await this.client.list(remotePath);
       return files;
     } catch (error) {
       this.logger.error('Failed to list files:', error);
       throw new Error('Failed to list files');
+    }
+  }
+
+  async renameFile(remoteFilePath: string, destinationFilePath: string): Promise<void> {
+    try {
+      const destinationDir = `${envsFtp.ftpRoot}${destinationFilePath.substring(0, destinationFilePath.lastIndexOf('/'))}`;
+
+      await this.client.ensureDir(destinationDir);
+      await this.client.rename(
+        `${envsFtp.ftpRoot}${remoteFilePath}`,
+        `${envsFtp.ftpRoot}${destinationFilePath}`,
+      );
+      this.logger.log(`File moved successfully ${destinationFilePath}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to move file from ${envsFtp.ftpRoot}${remoteFilePath} to ${envsFtp.ftpRoot}${destinationFilePath}`,
+        error,
+      );
+      throw new Error(`Failed to move file`);
     }
   }
 
