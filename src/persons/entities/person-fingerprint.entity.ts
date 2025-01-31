@@ -33,7 +33,4 @@ export class PersonFingerprint {
 
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
-
-  @Column('int')
-  attempts: number;
 }
