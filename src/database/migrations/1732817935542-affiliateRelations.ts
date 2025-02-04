@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner, TableForeignKey } from 'typeorm';
 
-export class affiliateRelations1732817935542 implements MigrationInterface {
+export class BeneficiaryAffiliateRelations1732817935542 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Crear la llave foránea entre affiliates y affiliate_states
     await queryRunner.createForeignKey(

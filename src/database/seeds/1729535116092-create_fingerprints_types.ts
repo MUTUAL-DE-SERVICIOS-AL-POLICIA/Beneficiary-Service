@@ -2,7 +2,7 @@ import { FingerprintType } from 'src/persons/entities';
 import { DataSource } from 'typeorm';
 import { Seeder } from 'typeorm-extension';
 
-export class CreateFingerprintsTypes implements Seeder {
+export class BeneficiaryCreateFingerprintsTypes implements Seeder {
   track = true;
 
   public async run(dataSource: DataSource): Promise<any> {

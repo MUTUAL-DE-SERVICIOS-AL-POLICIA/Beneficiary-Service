@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class affiliateDocument1732737898641 implements MigrationInterface {
+export class BeneficiaryAffiliateDocument1732737898641 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Crear la tabla
     await queryRunner.createTable(
