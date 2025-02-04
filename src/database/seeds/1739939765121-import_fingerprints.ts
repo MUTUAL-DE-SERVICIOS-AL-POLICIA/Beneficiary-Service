@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { FtpService } from 'src/common';
 
 export class BeneficiaryImportFingerprints implements Seeder {
-  track = false;
+  track = true;
 
   private separarNombreYNumero(filename: string): { name: string; quality: number | null } {
     const match = filename.match(/^(.*)_(\d+)\.wsq$/);
@@ -32,6 +32,7 @@ export class BeneficiaryImportFingerprints implements Seeder {
   }
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryImportFingerprints');
     const ftp = new FtpService();
     const path = 'Person/Fingerprints';
 
@@ -52,7 +53,6 @@ export class BeneficiaryImportFingerprints implements Seeder {
     const validAffiliates = await dataSource.query(`
             SELECT id FROM beneficiaries.persons WHERE id IN (${personIds.join(',')})
         `);
-    console.log(validAffiliates);
 
     let cont: number = 0;
     await dataSource.transaction(async (transactionalEntityManager) => {

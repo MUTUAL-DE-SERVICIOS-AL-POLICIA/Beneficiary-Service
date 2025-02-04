@@ -20,6 +20,7 @@ export class BeneficiaryImportRequirements implements Seeder {
   }
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryImportRequirements');
     const ftp = new FtpService();
     const path = 'Affiliate/Documents';
 

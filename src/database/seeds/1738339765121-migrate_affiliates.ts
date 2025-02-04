@@ -5,6 +5,7 @@ export class BeneficiaryMigrateAffiliates implements Seeder {
   track = true;
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryMigrateAffiliates');
     await dataSource.query(`INSERT INTO beneficiaries.persons (
       city_birth_id,
       pension_entity_id, financial_entity_id,

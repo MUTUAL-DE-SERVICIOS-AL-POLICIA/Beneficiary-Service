@@ -5,6 +5,7 @@ export class BeneficiaryMigrateOrphan implements Seeder {
   track = true;
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryMigrateOrphan');
     await dataSource.query(`
       with only_orphans as (
         select a.identity_card affiliate_ci, s.identity_card spouse_ci, eca.* 

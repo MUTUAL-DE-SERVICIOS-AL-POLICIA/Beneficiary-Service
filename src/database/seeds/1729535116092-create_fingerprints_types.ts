@@ -6,6 +6,8 @@ export class BeneficiaryCreateFingerprintsTypes implements Seeder {
   track = true;
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryCreateFingerprintsTypes');
+
     const repository = dataSource.getRepository(FingerprintType);
     await repository.insert([
       {

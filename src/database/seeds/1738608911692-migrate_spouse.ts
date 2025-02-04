@@ -5,6 +5,7 @@ export class BeneficiaryMigrateSpouse implements Seeder {
   track = true;
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryMigrateSpouse');
     await dataSource.query(`CREATE OR REPLACE PROCEDURE migrate_spouse()
     LANGUAGE plpgsql
     AS $procedure$
