@@ -3,9 +3,8 @@ import { DataSource } from 'typeorm';
 import { FtpService } from 'src/common';
 import * as readline from 'readline';
 
-export class ImportRequirements1730293751153 implements Seeder {
+export class BeneficiaryImportRequirements implements Seeder {
   track = true;
-
   async promptUser(question: string): Promise<string> {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -21,6 +20,7 @@ export class ImportRequirements1730293751153 implements Seeder {
   }
 
   public async run(dataSource: DataSource): Promise<any> {
+    console.log('Ejecutando BeneficiaryImportRequirements');
     const ftp = new FtpService();
     const path = 'Affiliate/Documents';
 
