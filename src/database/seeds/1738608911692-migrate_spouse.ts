@@ -72,7 +72,7 @@ export class BeneficiaryMigrateSpouse implements Seeder {
                         'persons',
                         persona_afiliado.id,
                         10,
-                        false
+                        true
                     );
                 ELSE
                     duplicate_record := duplicate_record + 1;
@@ -118,7 +118,7 @@ export class BeneficiaryMigrateSpouse implements Seeder {
                     'persons',
                     persona_afiliado.id,
                     10,
-                    false
+                    true
                 );
 
                 UPDATE spouses

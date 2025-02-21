@@ -50,14 +50,14 @@ export class PersonsService {
     const offset = (page - 1) * limit;
     const query = this.personRepository.createQueryBuilder('person');
     if (filter) {
-      const formattedFilter = filter.replace(/\s+/g, '').trim();
+      const formattedFilter = filter.trim();
       query.andWhere(
         ` person.identity_card ILIKE :filter OR
-          LOWER(CONCAT(
+          LOWER(TRIM(CONCAT_WS(' ',
               person.first_name,
-              COALESCE(person.second_name, ''),
+              person.second_name,
               person.last_name,
-              COALESCE(person.mothers_last_name, '')
+              person.mothers_last_name)
           )) LIKE :filter
         `,
         {
