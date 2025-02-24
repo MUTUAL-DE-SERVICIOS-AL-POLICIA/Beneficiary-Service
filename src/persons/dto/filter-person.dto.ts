@@ -5,4 +5,12 @@ export class FilteredPaginationDto extends PaginationDto {
   @IsOptional()
   @IsString()
   filter?: string;
+
+  @IsOptional()
+  @IsString()
+  orderBy?: string;
+
+  @IsOptional()
+  @IsString()
+  order?: 'ASC' | 'DESC' = 'ASC';
 }

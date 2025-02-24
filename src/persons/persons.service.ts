@@ -46,27 +46,56 @@ export class PersonsService {
   }
 
   async findAll(filteredPaginationDto: FilteredPaginationDto) {
-    const { limit = 10, page = 1, filter } = filteredPaginationDto;
+    const { limit = 10, page = 1, filter, orderBy = 'id', order = 'ASC' } = filteredPaginationDto;
     const offset = (page - 1) * limit;
     const query = this.personRepository.createQueryBuilder('person');
-    if (filter) {
-      const formattedFilter = filter.trim();
-      query.andWhere(
-        ` person.identity_card ILIKE :filter OR
-          LOWER(TRIM(CONCAT_WS(' ',
-              person.first_name,
-              person.second_name,
-              person.last_name,
-              person.mothers_last_name)
-          )) LIKE :filter
-        `,
-        {
-          filter: `%${formattedFilter}%`,
-        },
-      );
+    const filterValues = filter?.split(' ');
+    if (Array.isArray(filterValues) && filterValues.length > 0) {
+      const identityConditions: string[] = [];
+      const nameConditions: string[] = [];
+      const params: Record<string, string> = {};
+
+      filterValues.forEach((f, i) => {
+        const trimmedFilter = f.trim();
+        const paramKey = `filterValues${i}`;
+
+        if (/^\d+$/.test(trimmedFilter)) {
+          // Si es un número, solo busca en identity_card
+          identityConditions.push(`person.identity_card ILIKE :${paramKey}`);
+        } else {
+          // Si tiene letras, busca en los nombres
+          nameConditions.push(`
+            LOWER(TRIM(CONCAT_WS(' ',
+                person.first_name,
+                person.second_name,
+                person.last_name,
+                person.mothers_last_name)
+            )) LIKE :${paramKey}
+          `);
+        }
+
+        params[paramKey] = `%${trimmedFilter}%`;
+      });
+
+      const conditions = [];
+      if (identityConditions.length > 0) {
+        conditions.push(`(${identityConditions.join(' OR ')})`);
+      }
+      if (nameConditions.length > 0) {
+        conditions.push(`(${nameConditions.join(' AND ')})`);
+      }
+
+      if (conditions.length > 0) {
+        query.andWhere(conditions.join(' OR '), params);
+      }
     }
-    query.skip(offset).take(limit);
+
+    query
+      .skip(offset)
+      .take(limit)
+      .orderBy(`person.${orderBy}`, order as 'ASC' | 'DESC');
     const [persons, total] = await query.getManyAndCount();
+
     return {
       persons,
       total,
