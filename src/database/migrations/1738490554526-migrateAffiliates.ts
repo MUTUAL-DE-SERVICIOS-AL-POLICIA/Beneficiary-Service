@@ -1,12 +1,9 @@
-import { DataSource } from 'typeorm';
-import { Seeder } from 'typeorm-extension';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class BeneficiaryMigrateAffiliates implements Seeder {
-  track = true;
-
-  public async run(dataSource: DataSource): Promise<any> {
+export class MigrateAffiliates1738490554526 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
     console.log('Ejecutando BeneficiaryMigrateAffiliates');
-    await dataSource.query(`INSERT INTO beneficiaries.persons (
+    await queryRunner.query(`INSERT INTO beneficiaries.persons (
       city_birth_id,
       pension_entity_id, financial_entity_id,
       first_name, second_name, last_name,
@@ -27,25 +24,37 @@ export class BeneficiaryMigrateAffiliates implements Seeder {
             uuid_reference
             FROM public.affiliates
             order by id;`);
-    await dataSource.query(`INSERT INTO beneficiaries.state_types
+    await queryRunner.query(`INSERT INTO beneficiaries.state_types
     SELECT *
     FROM public.affiliate_state_types;`);
-    await dataSource.query(`INSERT INTO beneficiaries.affiliate_states (id, state_type_id, name)
+    await queryRunner.query(`INSERT INTO beneficiaries.affiliate_states (id, state_type_id, name)
     SELECT *
     FROM public.affiliate_states;`);
-    await dataSource.query(`INSERT INTO beneficiaries.affiliates (id, affiliate_state_id, registration, type, date_entry, date_derelict, reason_derelict, service_years, service_months,
+    await queryRunner.query(`INSERT INTO beneficiaries.affiliates (id, affiliate_state_id, registration, type, date_entry, date_derelict, reason_derelict, service_years, service_months,
     unit_police_description, created_at, updated_at, unit_id, category_id, degree_id)
     SELECT id, affiliate_state_id, registration, type, date_entry::date, date_derelict::date, reason_derelict, service_years, service_months,
     unit_police_description, created_at, updated_at,
     unit_id, category_id, degree_id
     FROM public.affiliates
     order by id;`);
-    await dataSource.query(`INSERT INTO beneficiaries.person_affiliates
+    await queryRunner.query(`INSERT INTO beneficiaries.person_affiliates
     (person_id, type, type_id, kinship_type, state)
     SELECT p.id, 'affiliates', a.id, 1, true
     FROM beneficiaries.persons p
     JOIN public.affiliates a
     ON p.uuid_column = a.uuid_reference
     ORDER BY p.id, a.id;`);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`TRUNCATE TABLE beneficiaries.persons RESTART IDENTITY CASCADE;`);
+    await queryRunner.query(`TRUNCATE TABLE beneficiaries.state_types RESTART IDENTITY CASCADE;`);
+    await queryRunner.query(
+      `TRUNCATE TABLE beneficiaries.affiliate_states RESTART IDENTITY CASCADE;`,
+    );
+    await queryRunner.query(`TRUNCATE TABLE beneficiaries.affiliates RESTART IDENTITY CASCADE;`);
+    await queryRunner.query(
+      `TRUNCATE TABLE beneficiaries.person_affiliates RESTART IDENTITY CASCADE;`,
+    );
   }
 }

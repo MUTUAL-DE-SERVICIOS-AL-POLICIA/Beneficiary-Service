@@ -1,12 +1,9 @@
-import { DataSource } from 'typeorm';
-import { Seeder } from 'typeorm-extension';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class BeneficiaryMigrateSpouse implements Seeder {
-  track = true;
-
-  public async run(dataSource: DataSource): Promise<any> {
+export class MigrateSpouse1738490554527 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
     console.log('Ejecutando BeneficiaryMigrateSpouse');
-    await dataSource.query(`CREATE OR REPLACE PROCEDURE migrate_spouse()
+    await queryRunner.query(`CREATE OR REPLACE PROCEDURE migrate_spouse()
     LANGUAGE plpgsql
     AS $procedure$
     DECLARE
@@ -155,4 +152,6 @@ export class BeneficiaryMigrateSpouse implements Seeder {
 
     CALL migrate_spouse();`);
   }
+
+  public async down(): Promise<void> {}
 }

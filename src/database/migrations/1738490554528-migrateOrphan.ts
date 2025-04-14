@@ -1,12 +1,9 @@
-import { DataSource } from 'typeorm';
-import { Seeder } from 'typeorm-extension';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class BeneficiaryMigrateOrphan implements Seeder {
-  track = true;
-
-  public async run(dataSource: DataSource): Promise<any> {
+export class MigrateOrphan1738490554528 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
     console.log('Ejecutando BeneficiaryMigrateOrphan');
-    await dataSource.query(`
+    await queryRunner.query(`
       with only_orphans as (
         select a.identity_card affiliate_ci, s.identity_card spouse_ci, eca.* 
         from public.eco_com_applicants eca 
@@ -36,7 +33,7 @@ export class BeneficiaryMigrateOrphan implements Seeder {
         nua , phone_number , reason_death ,
         second_name , surname_husband , uuid_generate_v4()_, updated_at from only_orphans;`);
 
-    await dataSource.query(`
+    await queryRunner.query(`
       with only_orphans as (
         select a.identity_card affiliate_ci, s.identity_card spouse_ci, eca.identity_card 
         from public.eco_com_applicants eca 
@@ -62,4 +59,6 @@ export class BeneficiaryMigrateOrphan implements Seeder {
       where p.identity_card in (select identity_card from only_orphans)
       and ec.eco_com_procedure_id = 25;`);
   }
+
+  public async down(): Promise<void> {}
 }
