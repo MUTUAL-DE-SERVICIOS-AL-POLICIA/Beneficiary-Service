@@ -43,7 +43,7 @@ export class BeneficiaryAddSpouseToPersonTrigger1738674910622 implements Migrati
                                     NEW.uuid_column::UUID
                             )
                             RETURNING id INTO new_person_id;
-                        insert into beneficiaries.person_affiliate (person_id, type, type_id,
+                        insert into beneficiaries.person_affiliates (person_id, type, type_id,
                                                                     state, kinship_type)
                             values (
                                     new_person_id,
@@ -111,7 +111,7 @@ export class BeneficiaryAddSpouseToPersonTrigger1738674910622 implements Migrati
                                     NEW.uuid_column::UUID
                             )
                             RETURNING id INTO new_person_id;
-                        insert into beneficiaries.person_affiliate (person_id, type, type_id,
+                        insert into beneficiaries.person_affiliates (person_id, type, type_id,
                                                                     state, kinship_type)
                             values (
                                     new_person_id,

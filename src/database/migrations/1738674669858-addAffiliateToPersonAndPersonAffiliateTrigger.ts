@@ -79,7 +79,7 @@ export class BeneficiaryAddAffiliateToPersonAndPersonAffiliateTrigger17386746698
                                     NEW.created_at::timestamp,
                                     NEW.updated_at::timestamp
                                 );
-                        insert into beneficiaries.person_affiliate (person_id, type, type_id,
+                        insert into beneficiaries.person_affiliates (person_id, type, type_id,
                                                                     state, kinship_type)
                             values (
                                     new_person_id,
@@ -205,7 +205,7 @@ export class BeneficiaryAddAffiliateToPersonAndPersonAffiliateTrigger17386746698
                                         NEW.created_at::timestamp,
                                         NEW.updated_at::timestamp
                                 );
-                            insert into beneficiaries.person_affiliate (person_id, type, type_id,
+                            insert into beneficiaries.person_affiliates (person_id, type, type_id,
                                                                     state, kinship_type)
                             values (
                                     new_person_id,
