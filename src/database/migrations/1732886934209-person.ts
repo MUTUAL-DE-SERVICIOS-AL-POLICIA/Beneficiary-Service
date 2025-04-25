@@ -62,6 +62,7 @@ export class BeneficiaryPerson1732886934209 implements MigrationInterface {
           {
             name: 'identity_card',
             type: 'text',
+            isUnique: true,
           },
           {
             name: 'due_date',

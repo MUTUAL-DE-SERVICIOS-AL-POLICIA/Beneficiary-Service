@@ -57,7 +57,7 @@ export class Person {
   })
   surnameHusband: string;
 
-  @Column('text')
+  @Column('text', { unique: true })
   identityCard: string;
 
   @Column('date', {
