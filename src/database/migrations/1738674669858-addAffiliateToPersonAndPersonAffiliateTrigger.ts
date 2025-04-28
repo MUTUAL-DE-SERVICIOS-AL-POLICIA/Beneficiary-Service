@@ -83,7 +83,7 @@ export class BeneficiaryAddAffiliateToPersonAndPersonAffiliateTrigger17386746698
                                                                     state, kinship_type)
                             values (
                                     new_person_id,
-                                    'affiliate',
+                                    'affiliates',
                                     NEW.id::int8,
                                     true,
                                     1
@@ -209,7 +209,7 @@ export class BeneficiaryAddAffiliateToPersonAndPersonAffiliateTrigger17386746698
                                                                     state, kinship_type)
                             values (
                                     new_person_id,
-                                    'affiliate',
+                                    'affiliates',
                                     NEW.id::int8,
                                     true,
                                     1
