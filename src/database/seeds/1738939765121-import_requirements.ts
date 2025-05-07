@@ -2,6 +2,7 @@ import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
 import { FtpService } from 'src/common';
 import * as readline from 'readline';
+import { envsFtp } from 'src/config/envs';
 
 export class BeneficiaryImportRequirements implements Seeder {
   track = true;
@@ -22,7 +23,7 @@ export class BeneficiaryImportRequirements implements Seeder {
   public async run(dataSource: DataSource): Promise<any> {
     console.log('Ejecutando BeneficiaryImportRequirements');
     const ftp = new FtpService();
-    const path = 'Affiliate/Documents';
+    const path = envsFtp.ftpDocuments;
 
     const initialFolder: {
       totalFolder: number;

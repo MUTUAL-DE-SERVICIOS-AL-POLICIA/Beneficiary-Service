@@ -15,6 +15,9 @@ interface EnvVars {
   FTP_PASSWORD: string;
   FTP_ROOT: string;
   FTP_SSL: boolean;
+  FTP_FINGERPRINTS: string;
+  FTP_DOCUMENTS: string;
+  FTP_IMPORT_DOCUMENTS_PVTBE: string;
 }
 
 const envsSchema = joi
@@ -72,4 +75,7 @@ export const envsFtp = {
   ftpPassword: envVars.FTP_PASSWORD,
   ftpRoot: envVars.FTP_ROOT,
   ftpSsl: envVars.FTP_SSL,
+  ftpFingerprints: envVars.FTP_FINGERPRINTS,
+  ftpDocuments: envVars.FTP_DOCUMENTS,
+  ftpImportDocumentsPvtbe: envVars.FTP_IMPORT_DOCUMENTS_PVTBE,
 };

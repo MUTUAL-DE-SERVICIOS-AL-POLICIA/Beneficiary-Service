@@ -57,8 +57,8 @@ export class AffiliatesController {
 
   @MessagePattern('affiliate.documentsAnalysis')
   documentsAnalysis(@Payload() payload: { path: string; user: string; pass: string }) {
-    const { path, user, pass } = payload;
-    return this.affiliatesService.documentsAnalysis(path, user, pass);
+    const { user, pass } = payload;
+    return this.affiliatesService.documentsAnalysis(user, pass);
   }
 
   @MessagePattern('affiliate.documentsImports')

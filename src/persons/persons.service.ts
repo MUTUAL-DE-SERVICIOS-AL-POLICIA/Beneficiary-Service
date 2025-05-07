@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { FtpService, NatsService } from 'src/common';
 import { RpcException } from '@nestjs/microservices';
+import { envsFtp } from 'src/config/envs';
 
 @Injectable()
 export class PersonsService {
@@ -282,7 +283,7 @@ export class PersonsService {
           where: { person: { id: personId }, fingerprintType: { id: fingerprintTypeId } },
           relations: ['fingerprintType'],
         });
-        const initialPath = `Person/Fingerprints/${personId}/`;
+        const initialPath = `${envsFtp.ftpFingerprints}/${personId}/`;
         const existingFingerprint = personFingerprints.find((fp) => fp.quality === quality);
         if (existingFingerprint) {
           acc.error.push(`Ya existe una huella con calidad ${quality}, no se subirá nuevamente.`);

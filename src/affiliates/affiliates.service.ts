@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { Affiliate, AffiliateDocument } from './entities';
 import { RpcException } from '@nestjs/microservices';
 import { DataSource } from 'typeorm';
+import { envsFtp } from 'src/config/envs';
 
 @Injectable()
 export class AffiliatesService {
@@ -89,7 +90,7 @@ export class AffiliatesService {
       this.ftp.connectToFtp(),
     ]);
 
-    const initialPath = `Affiliate/Documents/${affiliateId}/`;
+    const initialPath = `${envsFtp.ftpDocuments}/${affiliateId}/`;
 
     if (document.status === false)
       throw new RpcException({ message: 'Servicio de documentos no disponible', code: 400 });
@@ -231,9 +232,10 @@ export class AffiliatesService {
     };
   }
 
-  async documentsAnalysis(path: string, user: string, pass: string): Promise<any> {
+  async documentsAnalysis(user: string, pass: string): Promise<any> {
+    const path = envsFtp.ftpImportDocumentsPvtbe;
     const key = await this.nats.firstValue('auth.login', { username: user, password: pass });
-    const pathFtp = 'Affiliate/Documents';
+    const pathFtp = envsFtp.ftpDocuments;
 
     if (!key.status) {
       throw new RpcException({ message: 'Credenciales incorrectas', code: 401 });
