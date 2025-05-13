@@ -1,4 +1,4 @@
-import { Person, FingerprintType } from 'src/persons/entities';
+import { Person, FingerprintType } from './';
 import {
   Column,
   CreateDateColumn,

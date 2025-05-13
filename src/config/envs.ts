@@ -10,6 +10,13 @@ interface EnvVars {
   DB_USERNAME: string;
   DB_SYNCHRONIZE: boolean;
   DB_SCHEMA: string;
+
+  DB_TEST_PASSWORD: string;
+  DB_TEST_DATABASE: string;
+  DB_TEST_HOST: string;
+  DB_TEST_PORT: number;
+  DB_TEST_USERNAME: string;
+
   FTP_HOST: string;
   FTP_USERNAME: string;
   FTP_PASSWORD: string;
@@ -67,6 +74,14 @@ export const DbEnvs = {
   dbUsername: envVars.DB_USERNAME,
   dbSynchronize: envVars.DB_SYNCHRONIZE,
   dbSchema: envVars.DB_SCHEMA,
+};
+
+export const DbEnvsTest = {
+  dbTestPassword: envVars.DB_TEST_PASSWORD,
+  dbTestDatabase: envVars.DB_TEST_DATABASE,
+  dbTestHost: envVars.DB_TEST_HOST,
+  dbTestPort: envVars.DB_TEST_PORT,
+  dbTestUsername: envVars.DB_TEST_USERNAME,
 };
 
 export const envsFtp = {

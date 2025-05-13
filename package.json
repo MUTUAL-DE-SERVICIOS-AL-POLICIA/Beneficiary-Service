@@ -17,8 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed:run": "yarn build && node ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d src/database/data-source.ts",
+    "test:e2e": "jest --config ./test/jest-e2e.config.ts",
+    "seed:run": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d src/database/data-source.ts",
     "seed:create": "node ./node_modules/typeorm-extension/bin/cli.cjs seed:create",
     "migration:show": "ts-node -r tsconfig-paths/register ./node_modules/.bin/typeorm migration:show -d src/database/data-source.ts",
     "migration:create": "ts-node -r tsconfig-paths/register ./node_modules/.bin/typeorm migration:create src/database/migrations/",
@@ -73,23 +73,6 @@
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.3"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
