@@ -22,12 +22,12 @@ export class NatsService {
       this.client.send(service, data).pipe(
         map((response) => ({
           ...response,
-          status: true,
+          serviceStatus: true,
         })),
         catchError((error) => {
           this.logger.error(`Error calling microservice: ${service}`, error.message);
           return of({
-            status: false,
+            serviceStatus: false,
             message: 'Microservice call failed',
           });
         }),
@@ -60,7 +60,7 @@ export class NatsService {
     );
     return {
       ...filteredData,
-      status: data.status,
+      serviceStatus: data.serviceStatus,
     };
   }
 }
