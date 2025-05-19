@@ -152,8 +152,7 @@ export class PersonsService {
     const person = await this.findOnePerson(`${personId}`, 'id');
     const hasBeneficiaries = await this.showPersonsRelatedToAffiliate(personId);
     const features = {
-      isPolice:
-        person.personAffiliates.filter((affiliate) => affiliate.type === 'affiliates').length > 0,
+      isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
       hasBeneficiaries: hasBeneficiaries.length > 0,
       hasAffiliates:
         person.personAffiliates.filter((affiliate) => affiliate.type === 'persons').length > 0,
