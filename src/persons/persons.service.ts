@@ -173,10 +173,9 @@ export class PersonsService {
       personAffiliates.map(async (personAffiliate) => {
         const { kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
           personAffiliate;
-        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-          'createdAt',
-          'updatedAt',
-          'deletedAt',
+        const kinship = await this.nats.firstValueInclude({ id: kinshipType }, 'kinships.findOne', [
+          'id',
+          'name',
         ]);
         return {
           ...dataPersonAffiliate,
@@ -185,21 +184,18 @@ export class PersonsService {
       }),
     );
     const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
-      this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
-        'secondShortened',
-        'thirdShortened',
-        'toBank',
-        'latitude',
-        'longitude',
-        'companyAddress',
-        'phonePrefix',
-        'companyPhones',
-        'companyCellphones',
+      this.nats.firstValueInclude({ id: cityBirthId }, 'cities.findOne', [
+        'id',
+        'name',
+        'firstShortened',
       ]),
-      this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne', ['type', 'isActive']),
-      this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne', [
-        'createdAt',
-        'updatedAt',
+      this.nats.firstValueInclude({ id: pensionEntityId }, 'pensionEntities.findOne', [
+        'id',
+        'name',
+      ]),
+      this.nats.firstValueInclude({ id: pensionEntityId }, 'financialEntities.findOne', [
+        'id',
+        'name',
       ]),
     ]);
     const birthDateLiteral = format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es });
@@ -235,10 +231,9 @@ export class PersonsService {
       dependents.map(async (personAffiliate) => {
         const { person, kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
           personAffiliate;
-        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-          'createdAt',
-          'updatedAt',
-          'deletedAt',
+        const kinship = await this.nats.firstValueInclude({ id: kinshipType }, 'kinships.findOne', [
+          'id',
+          'name',
         ]);
         const personInfo = personAffiliate.person
           ? {

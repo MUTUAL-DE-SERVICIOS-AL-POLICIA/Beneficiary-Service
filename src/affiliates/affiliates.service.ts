@@ -48,22 +48,13 @@ export class AffiliatesService {
       affiliate;
 
     const [degree, unit, category] = await Promise.all([
-      this.nats.fetchAndClean(degreeId, 'degrees.findOne', [
-        'code',
-        'shortened',
-        'correlative',
-        'isActive',
-        'hierarchy',
+      this.nats.firstValueInclude({ id: degreeId }, 'degrees.findOne', ['id', 'name']),
+      this.nats.firstValueInclude({ id: unitId }, 'units.findOne', ['id', 'district', 'name']),
+      this.nats.firstValueInclude({ id: categoryId }, 'categories.findOne', [
+        'id',
+        'name',
+        'percentage',
       ]),
-      this.nats.fetchAndClean(unitId, 'units.findOne', [
-        'createdAt',
-        'updatedAt',
-        'deletedAt',
-        'breakdown',
-        'code',
-        'shortened',
-      ]),
-      this.nats.fetchAndClean(categoryId, 'categories.findOne', ['from', 'to']),
     ]);
 
     return {
