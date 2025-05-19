@@ -149,12 +149,14 @@ export class PersonsService {
   }
 
   async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
-    const person = await this.findAndVerifyPersonWithRelations(
-      personId,
-      'personAffiliates',
-      'affiliates',
-      'type',
-    );
+    const person = await this.findOnePerson(`${personId}`, 'id');
+    const hasBeneficiaries = await this.showPersonsRelatedToAffiliate(personId);
+    const features = {
+      isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
+      hasBeneficiaries: hasBeneficiaries.length > 0,
+      hasAffiliates:
+        person.personAffiliates.filter((affiliate) => affiliate.type === 'persons').length > 0,
+    };
     const {
       createdAt,
       updatedAt,
@@ -169,20 +171,7 @@ export class PersonsService {
       personAffiliates,
       ...dataPerson
     } = person;
-    const personAffiliate = await Promise.all(
-      personAffiliates.map(async (personAffiliate) => {
-        const { kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
-          personAffiliate;
-        const kinship = await this.nats.firstValueInclude({ id: kinshipType }, 'kinships.findOne', [
-          'id',
-          'name',
-        ]);
-        return {
-          ...dataPersonAffiliate,
-          kinship,
-        };
-      }),
-    );
+    const nup = person.personAffiliates.find((p) => p.type === 'affiliates')?.typeId ?? null;
     const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
       this.nats.firstValueInclude({ id: cityBirthId }, 'cities.findOne', [
         'id',
@@ -202,10 +191,11 @@ export class PersonsService {
     return {
       ...dataPerson,
       birthDateLiteral: birthDateLiteral,
-      personAffiliate,
+      nup,
       cityBirth,
       pensionEntity,
       financialEntity,
+      features,
     };
   }
 
