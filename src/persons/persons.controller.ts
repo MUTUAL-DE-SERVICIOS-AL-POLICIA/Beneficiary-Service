@@ -45,9 +45,9 @@ export class PersonsController {
     return this.personsService.findAffiliteRelatedWithPerson(id);
   }
 
-  @MessagePattern('person.showPersonsRelatedToAffiliate')
-  async showPersonsRelatedToAffiliate(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.showPersonsRelatedToAffiliate(id);
+  @MessagePattern('person.getBeneficiariesOfAffiliate')
+  async getBeneficiariesOfAffiliate(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.getBeneficiaries(id);
   }
 
   @MessagePattern('person.createPersonFingerprint')
