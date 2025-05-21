@@ -150,7 +150,7 @@ export class PersonsService {
 
   async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
     const person = await this.findOnePerson(`${personId}`, 'id');
-    const hasBeneficiaries = await this.showPersonsRelatedToAffiliate(personId);
+    const hasBeneficiaries = await this.getBeneficiaries(personId);
     const features = {
       isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
       hasBeneficiaries: hasBeneficiaries.length > 0,
@@ -209,8 +209,8 @@ export class PersonsService {
     return personAffiliates;
   }
 
-  async showPersonsRelatedToAffiliate(id: number): Promise<any> {
-    const dependents = await this.personAffiliateRepository.find({
+  async getBeneficiaries(id: number): Promise<any[]> {
+    const beneficiaries = await this.personAffiliateRepository.find({
       where: {
         typeId: id,
         type: 'persons',
@@ -218,31 +218,22 @@ export class PersonsService {
       relations: ['person'],
     });
     const personAffiliate = await Promise.all(
-      dependents.map(async (personAffiliate) => {
-        const { person, kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
-          personAffiliate;
+      beneficiaries.map(async (personAffiliate) => {
+        const { person, kinshipType } = personAffiliate;
         const kinship = await this.nats.firstValueInclude({ id: kinshipType }, 'kinships.findOne', [
           'id',
           'name',
         ]);
-        const personInfo = personAffiliate.person
-          ? {
-              full_name: [
-                personAffiliate.person.firstName,
-                personAffiliate.person.secondName,
-                personAffiliate.person.lastName,
-                personAffiliate.person.mothersLastName,
-              ]
-                .filter(Boolean)
-                .join(' '),
-              identityCard: personAffiliate.person.identityCard,
-            }
-          : null;
 
         return {
-          ...dataPersonAffiliate,
-          kinship,
-          person: personInfo,
+          fullName: person
+            ? [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+                .filter(Boolean)
+                .join(' ')
+            : null,
+          kinship: kinship ?? null,
+          ci: person?.identityCard ?? null,
+          personId: person?.id ?? null,
         };
       }),
     );
