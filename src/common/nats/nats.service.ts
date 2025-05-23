@@ -35,7 +35,11 @@ export class NatsService {
     );
   }
 
-  async firstValueExclude(params: Record<string, unknown>, service: string, keysToOmit: string[]) {
+  async firstValueExclude(
+    params: Record<string, unknown>,
+    service: string,
+    keysToOmit: string[]
+  ): Promise<Record<string, unknown> | null> {
     if (!this.isValidParams(params)) {
       return null;
     }
@@ -49,7 +53,7 @@ export class NatsService {
     params: Record<string, unknown>,
     service: string,
     keysToInclude: string[],
-  ) {
+  ): Promise<Record<string, unknown> | null> {
     if (!this.isValidParams(params)) {
       return null;
     }
