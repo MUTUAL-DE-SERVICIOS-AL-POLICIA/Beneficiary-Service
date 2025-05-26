@@ -40,9 +40,9 @@ export class PersonsController {
     return this.personsService.findPersonAffiliatesWithDetails(id);
   }
 
-  @MessagePattern('person.findAffiliteRelatedWithPerson')
-  async findAffiliteRelatedWithPerson(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.findAffiliteRelatedWithPerson(id);
+  @MessagePattern('person.findAffiliates')
+  async findAffilites(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.findAffiliates(id);
   }
 
   @MessagePattern('person.getBeneficiariesOfAffiliate')
