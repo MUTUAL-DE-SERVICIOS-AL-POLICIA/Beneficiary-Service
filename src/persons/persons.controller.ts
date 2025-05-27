@@ -1,4 +1,4 @@
-import { Controller, ParseIntPipe } from '@nestjs/common';
+import { Controller, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
 import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -35,9 +35,9 @@ export class PersonsController {
     return this.personsService.remove(id);
   }
 
-  @MessagePattern('person.findPersonAffiliatesWithDetails')
-  async findPersonAffiliatesWithDetails(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.findPersonAffiliatesWithDetails(id);
+  @MessagePattern('person.findOneWithFeatures')
+  async findPersonAffiliatesWithDetails(@Payload('uuid', ParseUUIDPipe) uuid: string) {
+    return this.personsService.findPersonAffiliatesWithDetails(uuid);
   }
 
   @MessagePattern('person.findAffiliates')
