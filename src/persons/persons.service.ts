@@ -105,14 +105,13 @@ export class PersonsService {
 
   async findOnePerson(term: string, field: string): Promise<Person> {
     const queryBuilder = this.personRepository.createQueryBuilder('person');
+    const value = field === 'id' ? +term : term;
     const person = await queryBuilder
       .leftJoinAndSelect('person.personAffiliates', 'personAffiliates')
       .leftJoinAndSelect('person.personFingerprints', 'personFingerprints')
       .leftJoinAndSelect('personFingerprints.fingerprintType', 'fingerprintType')
-      .where(`person.${field} = :value`, { value: field === 'id' ? +term : term })
+      .where(`person.${field} = :value`, { value })
       .getOne();
-    console.log(term);
-    console.log('field', field);
     if (!person) {
       throw new RpcException({
         code: 404,
@@ -148,9 +147,9 @@ export class PersonsService {
     }
   }
 
-  async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
-    const person = await this.findOnePerson(`${personId}`, 'id');
-    const hasBeneficiaries = await this.getBeneficiaries(personId);
+  async findPersonAffiliatesWithDetails(personId: string): Promise<any> {
+    const person = await this.findOnePerson(`${personId}`, 'uuid_column');
+    const hasBeneficiaries = await this.getBeneficiaries(person.id);
     const features = {
       isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
       hasBeneficiaries: hasBeneficiaries.length > 0,
