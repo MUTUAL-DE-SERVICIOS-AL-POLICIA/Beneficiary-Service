@@ -152,7 +152,7 @@ export class PersonsService {
     const hasBeneficiaries = await this.getBeneficiaries(person.id);
     const features = {
       isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
-      hasBeneficiaries: hasBeneficiaries.length > 0,
+      hasBeneficiaries: hasBeneficiaries.beneficiaries.length > 0,
       hasAffiliates:
         person.personAffiliates.filter((affiliate) => affiliate.type === 'persons').length > 0,
     };
