@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { format } from 'date-fns';
@@ -199,14 +199,41 @@ export class PersonsService {
     };
   }
 
-  async findAffiliteRelatedWithPerson(id: number): Promise<any> {
+  async findAffiliates(id: number): Promise<any> {
     const personAffiliates = await this.findAndVerifyPersonWithRelations(
       id,
       'personAffiliates',
       'persons',
       'type',
     );
-    return personAffiliates;
+    const typeIds = personAffiliates.personAffiliates.map((pa) => pa.typeId);
+    const affiliates = await this.personRepository.find({
+      where: { id: In(typeIds) },
+      relations: ['personAffiliates'],
+      select: [
+        'id',
+        'firstName',
+        'secondName',
+        'lastName',
+        'mothersLastName',
+        'identityCard',
+        'personAffiliates',
+      ],
+    });
+    const result = affiliates.map((person) => {
+      const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
+      return {
+        personId: person.id,
+        fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+          .filter(Boolean)
+          .join(' '),
+        nup: affiliateRelation?.typeId ?? null,
+        identityCard: person.identityCard,
+      };
+    });
+    return {
+      affiliates: result,
+    };
   }
 
   async getBeneficiaries(id: number): Promise<any> {
