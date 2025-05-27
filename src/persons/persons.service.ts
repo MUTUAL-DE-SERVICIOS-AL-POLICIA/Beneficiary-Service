@@ -220,7 +220,7 @@ export class PersonsService {
         'personAffiliates',
       ],
     });
-    const result = affiliates.map((person) => {
+    const affiliatesResponse = affiliates.map((person) => {
       const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
       return {
         personId: person.id,
@@ -231,9 +231,7 @@ export class PersonsService {
         identityCard: person.identityCard,
       };
     });
-    return {
-      affiliates: result,
-    };
+    return affiliatesResponse;
   }
 
   async getBeneficiaries(id: number): Promise<any> {
