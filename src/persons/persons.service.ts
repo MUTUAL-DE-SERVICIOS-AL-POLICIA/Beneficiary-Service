@@ -220,7 +220,7 @@ export class PersonsService {
         'personAffiliates',
       ],
     });
-    const result = affiliates.map((person) => {
+    const affiliatesResponse = affiliates.map((person) => {
       const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
       return {
         personId: person.id,
@@ -231,29 +231,27 @@ export class PersonsService {
         identityCard: person.identityCard,
       };
     });
-    return {
-      affiliates: result,
-    };
+    return affiliatesResponse;
   }
 
   async getBeneficiaries(id: number): Promise<any> {
-    const beneficiaries = await this.personAffiliateRepository.find({
+    const beneficiariesList = await this.personAffiliateRepository.find({
       where: { typeId: id, type: 'persons' },
       relations: ['person'],
     });
-    const kinshipTypeIds = [...new Set(beneficiaries.map((b) => b.kinshipType))];
+    const kinshipTypeIds = [...new Set(beneficiariesList.map((b) => b.kinshipType))];
     const kinships = await this.nats.firstValue('kinships.findAllByIds', { ids: kinshipTypeIds });
-    const personAffiliates = beneficiaries.map(({ person, kinshipType }) => ({
+    const beneficiaries = beneficiariesList.map(({ person, kinshipType }) => ({
       fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
         .filter(Boolean)
         .join(' '),
-      kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType] ?? kinshipType),
+      kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType].name ?? kinshipType),
       ci: person.identityCard,
       personId: person.id,
     }));
     return {
       serviceStatus: kinships.serviceStatus,
-      personAffiliates,
+      beneficiaries,
     };
   }
   async createPersonFingerPrint(
