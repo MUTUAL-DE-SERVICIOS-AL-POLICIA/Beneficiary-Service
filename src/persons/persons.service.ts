@@ -210,7 +210,7 @@ export class PersonsService {
       where: { id: In(typeIds) },
       relations: ['personAffiliates'],
       select: [
-        'id',
+        'uuidColumn',
         'firstName',
         'secondName',
         'lastName',
@@ -222,7 +222,7 @@ export class PersonsService {
     const affiliatesResponse = affiliates.map((person) => {
       const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
       return {
-        personId: person.id,
+        personUuid: person.uuidColumn,
         fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
           .filter(Boolean)
           .join(' '),
@@ -246,7 +246,7 @@ export class PersonsService {
         .join(' '),
       kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType].name ?? kinshipType),
       ci: person.identityCard,
-      personId: person.id,
+      personUuid: person.uuidColumn,
     }));
     return {
       serviceStatus: kinships.serviceStatus,
