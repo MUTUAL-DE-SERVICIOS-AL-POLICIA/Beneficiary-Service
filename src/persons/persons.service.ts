@@ -245,7 +245,7 @@ export class PersonsService {
         .filter(Boolean)
         .join(' '),
       kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType].name ?? kinshipType),
-      ci: person.identityCard,
+      identityCard: person.identityCard,
       uuidColumn: person.uuidColumn,
     }));
     return {
