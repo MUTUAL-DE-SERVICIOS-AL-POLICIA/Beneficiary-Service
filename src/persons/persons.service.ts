@@ -222,7 +222,7 @@ export class PersonsService {
     const affiliatesResponse = affiliates.map((person) => {
       const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
       return {
-        personUuid: person.uuidColumn,
+        uuidColumn: person.uuidColumn,
         fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
           .filter(Boolean)
           .join(' '),
@@ -246,7 +246,7 @@ export class PersonsService {
         .join(' '),
       kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType].name ?? kinshipType),
       ci: person.identityCard,
-      personUuid: person.uuidColumn,
+      uuidColumn: person.uuidColumn,
     }));
     return {
       serviceStatus: kinships.serviceStatus,
