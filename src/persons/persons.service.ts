@@ -283,7 +283,7 @@ export class PersonsService {
           where: { person: { id: personId }, fingerprintType: { id: fingerprintTypeId } },
           relations: ['fingerprintType'],
         });
-        const initialPath = `${envsFtp.ftpRoot}${envsFtp.ftpFingerprints}/${personId}/`;
+        const initialPath = `${envsFtp.ftpFingerprints}/${personId}/`;
         const existingFingerprint = personFingerprints.find((fp) => fp.quality === quality);
         if (existingFingerprint) {
           acc.error.push(`Ya existe una huella con calidad ${quality}, no se subirá nuevamente.`);
