@@ -60,7 +60,7 @@ export class PersonsService {
         const trimmedFilter = f.trim();
         const paramKey = `filterValues${i}`;
 
-        if (/^\d+$/.test(trimmedFilter)) {
+        if (/^\d/.test(trimmedFilter)) {
           // Si es un número, solo busca en identity_card
           identityConditions.push(`person.identity_card ILIKE :${paramKey}`);
         } else {
