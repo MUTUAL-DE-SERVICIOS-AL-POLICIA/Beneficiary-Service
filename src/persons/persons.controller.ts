@@ -1,4 +1,4 @@
-import { Controller, ParseIntPipe } from '@nestjs/common';
+import { Controller, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
 import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -35,19 +35,19 @@ export class PersonsController {
     return this.personsService.remove(id);
   }
 
-  @MessagePattern('person.findPersonAffiliatesWithDetails')
-  async findPersonAffiliatesWithDetails(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.findPersonAffiliatesWithDetails(id);
+  @MessagePattern('person.findOneWithFeatures')
+  async findPersonAffiliatesWithDetails(@Payload('uuid', ParseUUIDPipe) uuid: string) {
+    return this.personsService.findPersonAffiliatesWithDetails(uuid);
   }
 
-  @MessagePattern('person.findAffiliteRelatedWithPerson')
-  async findAffiliteRelatedWithPerson(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.findAffiliteRelatedWithPerson(id);
+  @MessagePattern('person.findAffiliates')
+  async findAffilites(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.findAffiliates(id);
   }
 
-  @MessagePattern('person.showPersonsRelatedToAffiliate')
-  async showPersonsRelatedToAffiliate(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.showPersonsRelatedToAffiliate(id);
+  @MessagePattern('person.getBeneficiariesOfAffiliate')
+  async getBeneficiariesOfAffiliate(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.getBeneficiaries(id);
   }
 
   @MessagePattern('person.createPersonFingerprint')

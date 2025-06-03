@@ -9,17 +9,25 @@ export class NatsService {
 
   constructor(@Inject(NATS_SERVICE) private readonly client: ClientProxy) {}
 
+  private isValidParams(params: Record<string, unknown>): boolean {
+    return (
+      params &&
+      typeof params === 'object' &&
+      Object.values(params).some((value) => value !== null && value !== undefined)
+    );
+  }
+
   async firstValue(service: string, data: any): Promise<any> {
     return firstValueFrom(
       this.client.send(service, data).pipe(
         map((response) => ({
           ...response,
-          status: true,
+          serviceStatus: true,
         })),
         catchError((error) => {
           this.logger.error(`Error calling microservice: ${service}`, error.message);
           return of({
-            status: false,
+            serviceStatus: false,
             message: 'Microservice call failed',
           });
         }),
@@ -27,11 +35,36 @@ export class NatsService {
     );
   }
 
-  async fetchAndClean(entityId: number | undefined, service: string, keysToOmit: string[]) {
-    if (!entityId) return null;
-    const data = await this.firstValue(service, { id: entityId });
+  async firstValueExclude(
+    params: Record<string, unknown>,
+    service: string,
+    keysToOmit: string[]
+  ): Promise<Record<string, unknown> | null> {
+    if (!this.isValidParams(params)) {
+      return null;
+    }
+    const data = await this.firstValue(service, params);
     if (!data) return null;
     keysToOmit.forEach((key) => delete data[key]);
     return data;
+  }
+
+  async firstValueInclude(
+    params: Record<string, unknown>,
+    service: string,
+    keysToInclude: string[],
+  ): Promise<Record<string, unknown> | null> {
+    if (!this.isValidParams(params)) {
+      return null;
+    }
+    const data = await this.firstValue(service, params);
+    if (!data) return null;
+    const filteredData = Object.fromEntries(
+      keysToInclude.filter((key) => key in data).map((key) => [key, data[key]]),
+    );
+    return {
+      ...filteredData,
+      serviceStatus: data.serviceStatus,
+    };
   }
 }
