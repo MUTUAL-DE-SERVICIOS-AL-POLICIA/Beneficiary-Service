@@ -38,7 +38,7 @@ export class NatsService {
   async firstValueExclude(
     params: Record<string, unknown>,
     service: string,
-    keysToOmit: string[]
+    keysToOmit: string[],
   ): Promise<Record<string, unknown> | null> {
     if (!this.isValidParams(params)) {
       return null;
