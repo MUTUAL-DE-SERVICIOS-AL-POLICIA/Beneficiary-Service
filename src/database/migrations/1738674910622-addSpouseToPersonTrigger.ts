@@ -160,7 +160,7 @@ export class BeneficiaryAddSpouseToPersonTrigger1738674910622 implements Migrati
                             );
                         END IF;
                     ELSIF TG_OP = 'DELETE' THEN
-                        DELETE FROM beneficiaries.persons WHERE id = OLD.id;
+                        DELETE FROM beneficiaries.persons WHERE uuid_column = OLD.uuid_column;
                     END IF;
                 PERFORM set_config('session_replication_role', 'origin', true);
                 END IF;

@@ -45,7 +45,7 @@ export class BeneficiaryAddPersonAffiliateToPublicAffiliateTrigger1738674390614
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-        DROP TRIGGER trg_replicate_persons_aff_to_public_affiliates ON beneficiaries.affiliates;    
+        DROP TRIGGER IF EXISTS trg_replicate_persons_aff_to_public_affiliates ON beneficiaries.affiliates;    
     `);
   }
 }
