@@ -54,7 +54,7 @@ export class MigrateSpouse1738490554527 implements MigrationInterface {
             
                 IF FOUND THEN                         -- es conyuge y afiliado?
                     UPDATE spouses 
-                    SET uuid_column = afiliado.uuid_reference
+                    SET uuid_column = persona_esposa.uuid_column
                     WHERE identity_card = campo.identity_card;
 
                     total_affiliate_and_spouse := total_affiliate_and_spouse + 1;
