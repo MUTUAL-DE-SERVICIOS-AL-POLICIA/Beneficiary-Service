@@ -31,5 +31,6 @@ export class BeneficiaryAddUuidAffiliatesAndSpouse1738340797410 implements Migra
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropColumn('public.affiliates', 'uuid_reference');
+    await queryRunner.dropColumn('public.spouses', 'uuid_column');
   }
 }
