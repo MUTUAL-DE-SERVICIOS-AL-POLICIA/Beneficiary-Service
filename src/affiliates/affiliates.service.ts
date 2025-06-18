@@ -48,22 +48,13 @@ export class AffiliatesService {
       affiliate;
 
     const [degree, unit, category] = await Promise.all([
-      this.nats.fetchAndClean(degreeId, 'degrees.findOne', [
-        'code',
-        'shortened',
-        'correlative',
-        'isActive',
-        'hierarchy',
+      this.nats.firstValueInclude({ id: degreeId }, 'degrees.findOne', ['id', 'name']),
+      this.nats.firstValueInclude({ id: unitId }, 'units.findOne', ['id', 'district', 'name']),
+      this.nats.firstValueInclude({ id: categoryId }, 'categories.findOne', [
+        'id',
+        'name',
+        'percentage',
       ]),
-      this.nats.fetchAndClean(unitId, 'units.findOne', [
-        'createdAt',
-        'updatedAt',
-        'deletedAt',
-        'breakdown',
-        'code',
-        'shortened',
-      ]),
-      this.nats.fetchAndClean(categoryId, 'categories.findOne', ['from', 'to']),
     ]);
 
     return {
@@ -78,7 +69,7 @@ export class AffiliatesService {
     affiliateId: number,
     procedureDocumentId: number,
     documentPdf: Buffer,
-  ): Promise<{ status: boolean; message: string }> {
+  ): Promise<{ serviceStatus: boolean; message: string }> {
     const [document, affiliate] = await Promise.all([
       this.nats.firstValue('procedureDocuments.findOne', { id: procedureDocumentId }),
       this.findAndVerifyAffiliateWithRelationOneCondition(
@@ -92,7 +83,7 @@ export class AffiliatesService {
 
     const initialPath = `${envsFtp.ftpDocuments}/${affiliateId}/`;
 
-    if (document.status === false)
+    if (document.serviceStatus === false)
       throw new RpcException({ message: 'Servicio de documentos no disponible', code: 400 });
 
     let affiliateDocument: AffiliateDocument;
@@ -119,7 +110,7 @@ export class AffiliatesService {
     this.ftp.onDestroy();
 
     return {
-      status: document.status,
+      serviceStatus: document.serviceStatus,
       message: `${document.name} ${response} exitosamente`,
     };
   }
@@ -144,7 +135,7 @@ export class AffiliatesService {
       ...documentNames[procedureDocumentId],
     }));
 
-    return { status: documentNames.status, documentsAffiliate };
+    return { serviceStatus: documentNames.serviceStatus, documentsAffiliate };
   }
 
   async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
@@ -181,13 +172,13 @@ export class AffiliatesService {
       }),
     ]);
 
-    if (!modality.status) return modality;
+    if (!modality.serviceStatus) return modality;
 
     const { affiliateDocuments } = affiliate;
     const { procedureRequirements } = modality;
 
     if (!procedureRequirements.length) {
-      return { status: false, message: 'No hay documentos requeridos' };
+      return { serviceStatus: false, message: 'No hay documentos requeridos' };
     }
 
     const affiliateDocumentsSet = new Set(affiliateDocuments.map((doc) => doc.procedureDocumentId));
@@ -225,7 +216,7 @@ export class AffiliatesService {
     });
 
     return {
-      status: modality.status,
+      serviceStatus: modality.serviceStatus,
       requiredDocuments: Object.fromEntries(requiredDocuments),
       additionallyDocumentsUpload,
       additionallyDocuments,
@@ -237,7 +228,7 @@ export class AffiliatesService {
     const key = await this.nats.firstValue('auth.login', { username: user, password: pass });
     const pathFtp = envsFtp.ftpDocuments;
 
-    if (!key.status) {
+    if (!key.serviceStatus) {
       throw new RpcException({ message: 'Credenciales incorrectas', code: 401 });
     }
 

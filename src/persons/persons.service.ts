@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { format } from 'date-fns';
@@ -60,7 +60,7 @@ export class PersonsService {
         const trimmedFilter = f.trim();
         const paramKey = `filterValues${i}`;
 
-        if (/^\d+$/.test(trimmedFilter)) {
+        if (/^\d/.test(trimmedFilter)) {
           // Si es un número, solo busca en identity_card
           identityConditions.push(`person.identity_card ILIKE :${paramKey}`);
         } else {
@@ -105,14 +105,13 @@ export class PersonsService {
 
   async findOnePerson(term: string, field: string): Promise<Person> {
     const queryBuilder = this.personRepository.createQueryBuilder('person');
+    const value = field === 'id' ? +term : term;
     const person = await queryBuilder
       .leftJoinAndSelect('person.personAffiliates', 'personAffiliates')
       .leftJoinAndSelect('person.personFingerprints', 'personFingerprints')
       .leftJoinAndSelect('personFingerprints.fingerprintType', 'fingerprintType')
-      .where(`person.${field} = :value`, { value: field === 'id' ? +term : term })
+      .where(`person.${field} = :value`, { value })
       .getOne();
-    console.log(term);
-    console.log('field', field);
     if (!person) {
       throw new RpcException({
         code: 404,
@@ -148,13 +147,15 @@ export class PersonsService {
     }
   }
 
-  async findPersonAffiliatesWithDetails(personId: number): Promise<any> {
-    const person = await this.findAndVerifyPersonWithRelations(
-      personId,
-      'personAffiliates',
-      'affiliates',
-      'type',
-    );
+  async findPersonAffiliatesWithDetails(personId: string): Promise<any> {
+    const person = await this.findOnePerson(`${personId}`, 'uuid_column');
+    const hasBeneficiaries = await this.getBeneficiaries(person.id);
+    const features = {
+      isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
+      hasBeneficiaries: hasBeneficiaries.beneficiaries.length > 0,
+      hasAffiliates:
+        person.personAffiliates.filter((affiliate) => affiliate.type === 'persons').length > 0,
+    };
     const {
       createdAt,
       updatedAt,
@@ -169,101 +170,89 @@ export class PersonsService {
       personAffiliates,
       ...dataPerson
     } = person;
-    const personAffiliate = await Promise.all(
-      personAffiliates.map(async (personAffiliate) => {
-        const { kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
-          personAffiliate;
-        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-          'createdAt',
-          'updatedAt',
-          'deletedAt',
-        ]);
-        return {
-          ...dataPersonAffiliate,
-          kinship,
-        };
-      }),
-    );
+    const nup = person.personAffiliates.find((p) => p.type === 'affiliates')?.typeId ?? null;
     const [cityBirth, pensionEntity, financialEntity] = await Promise.all([
-      this.nats.fetchAndClean(cityBirthId, 'cities.findOne', [
-        'secondShortened',
-        'thirdShortened',
-        'toBank',
-        'latitude',
-        'longitude',
-        'companyAddress',
-        'phonePrefix',
-        'companyPhones',
-        'companyCellphones',
+      this.nats.firstValueInclude({ id: cityBirthId }, 'cities.findOne', [
+        'id',
+        'name',
+        'firstShortened',
       ]),
-      this.nats.fetchAndClean(pensionEntityId, 'pensionEntities.findOne', ['type', 'isActive']),
-      this.nats.fetchAndClean(financialEntityId, 'financialEntities.findOne', [
-        'createdAt',
-        'updatedAt',
+      this.nats.firstValueInclude({ id: pensionEntityId }, 'pensionEntities.findOne', [
+        'id',
+        'name',
+      ]),
+      this.nats.firstValueInclude({ id: pensionEntityId }, 'financialEntities.findOne', [
+        'id',
+        'name',
       ]),
     ]);
     const birthDateLiteral = format(person.birthDate, "d 'de' MMMM 'de' yyyy", { locale: es });
     return {
       ...dataPerson,
       birthDateLiteral: birthDateLiteral,
-      personAffiliate,
+      nup,
       cityBirth,
       pensionEntity,
       financialEntity,
+      features,
     };
   }
 
-  async findAffiliteRelatedWithPerson(id: number): Promise<any> {
+  async findAffiliates(id: number): Promise<any> {
     const personAffiliates = await this.findAndVerifyPersonWithRelations(
       id,
       'personAffiliates',
       'persons',
       'type',
     );
-    return personAffiliates;
+    const typeIds = personAffiliates.personAffiliates.map((pa) => pa.typeId);
+    const affiliates = await this.personRepository.find({
+      where: { id: In(typeIds) },
+      relations: ['personAffiliates'],
+      select: [
+        'uuidColumn',
+        'firstName',
+        'secondName',
+        'lastName',
+        'mothersLastName',
+        'identityCard',
+        'personAffiliates',
+      ],
+    });
+    const affiliatesResponse = affiliates.map((person) => {
+      const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
+      return {
+        uuidColumn: person.uuidColumn,
+        fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+          .filter(Boolean)
+          .join(' '),
+        nup: affiliateRelation?.typeId ?? null,
+        identityCard: person.identityCard,
+      };
+    });
+    return affiliatesResponse;
   }
 
-  async showPersonsRelatedToAffiliate(id: number): Promise<any> {
-    const dependents = await this.personAffiliateRepository.find({
-      where: {
-        typeId: id,
-        type: 'persons',
-      },
+  async getBeneficiaries(id: number): Promise<any> {
+    const beneficiariesList = await this.personAffiliateRepository.find({
+      where: { typeId: id, type: 'persons' },
       relations: ['person'],
     });
-    const personAffiliate = await Promise.all(
-      dependents.map(async (personAffiliate) => {
-        const { person, kinshipType, createdAt, updatedAt, deletedAt, ...dataPersonAffiliate } =
-          personAffiliate;
-        const kinship = await this.nats.fetchAndClean(kinshipType, 'kinships.findOne', [
-          'createdAt',
-          'updatedAt',
-          'deletedAt',
-        ]);
-        const personInfo = personAffiliate.person
-          ? {
-              full_name: [
-                personAffiliate.person.firstName,
-                personAffiliate.person.secondName,
-                personAffiliate.person.lastName,
-                personAffiliate.person.mothersLastName,
-              ]
-                .filter(Boolean)
-                .join(' '),
-              identityCard: personAffiliate.person.identityCard,
-            }
-          : null;
-
-        return {
-          ...dataPersonAffiliate,
-          kinship,
-          person: personInfo,
-        };
-      }),
-    );
-    return personAffiliate;
+    const kinshipTypeIds = [...new Set(beneficiariesList.map((b) => b.kinshipType))];
+    const kinships = await this.nats.firstValue('kinships.findAllByIds', { ids: kinshipTypeIds });
+    const beneficiaries = beneficiariesList.map(({ person, kinshipType }) => ({
+      fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+        .filter(Boolean)
+        .join(' '),
+      kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType].name ?? kinshipType),
+      identityCard: person.identityCard,
+      uuidColumn: person.uuidColumn,
+    }));
+    return {
+      serviceStatus: kinships.serviceStatus,
+      beneficiaries,
+    };
   }
-
   async createPersonFingerPrint(
     createPersonFingerprintDto: CreatePersonFingerprintDto,
   ): Promise<{ message: string; registros: { success: string[]; error: string[] } }> {
