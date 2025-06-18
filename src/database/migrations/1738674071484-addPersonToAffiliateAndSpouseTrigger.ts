@@ -77,7 +77,7 @@ export class BeneficiaryAddPersonToAffiliateAndSpouseTrigger1738674071484
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-        DROP TRIGGER trg_replicate_persons_to_affiliates_and_spouse ON beneficiaries.persons;    
+        DROP TRIGGER IF EXISTS trg_replicate_persons_to_affiliates_and_spouse ON beneficiaries.persons;    
     `);
   }
 }

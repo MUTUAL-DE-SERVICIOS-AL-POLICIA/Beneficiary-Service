@@ -4,7 +4,7 @@ export class BeneficiaryAddUuidAffiliatesAndSpouse1738340797410 implements Migra
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
     const hasColumn = await queryRunner.hasColumn('public.affiliates', 'uuid_reference');
-    if(!hasColumn){
+    if (!hasColumn) {
       await queryRunner.addColumn(
         'public.affiliates',
         new TableColumn({
@@ -16,7 +16,7 @@ export class BeneficiaryAddUuidAffiliatesAndSpouse1738340797410 implements Migra
       );
     }
     const hasColumn2 = await queryRunner.hasColumn('public.spouses', 'uuid_column');
-    if(!hasColumn2){
+    if (!hasColumn2) {
       await queryRunner.addColumn(
         'public.spouses',
         new TableColumn({
@@ -31,5 +31,6 @@ export class BeneficiaryAddUuidAffiliatesAndSpouse1738340797410 implements Migra
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropColumn('public.affiliates', 'uuid_reference');
+    await queryRunner.dropColumn('public.spouses', 'uuid_column');
   }
 }
