@@ -22,7 +22,7 @@ export class BeneficiaryAffiliateRelations1732817935542 implements MigrationInte
         columnNames: ['state_type_id'],
         referencedColumnNames: ['id'],
         referencedTableName: 'beneficiaries.state_types',
-        onDelete: 'SET NULL',
+        onDelete: 'RESTRICT',
       }),
     );
 
@@ -34,7 +34,7 @@ export class BeneficiaryAffiliateRelations1732817935542 implements MigrationInte
         columnNames: ['affiliate_id'],
         referencedColumnNames: ['id'],
         referencedTableName: 'beneficiaries.affiliates',
-        onDelete: 'CASCADE',
+        onDelete: 'RESTRICT',
       }),
     );
   }
