@@ -34,11 +34,9 @@ export class BeneficiaryImportFingerprints implements Seeder {
   public async run(dataSource: DataSource): Promise<any> {
     console.log('Ejecutando BeneficiaryImportFingerprints');
     const ftp = new FtpService();
-    const path = 'pvt/Person/Fingerprints';
+    const path = 'Person/Fingerprints';
 
     await ftp.connectToFtp();
-    //console.log(await ftp.listFiles(path));
-
     const { personIds } = (await ftp.listFiles(path)).reduce(
       (result, file) => {
         const isOnlyNumbers = file.name.match(/^\d+$/);
