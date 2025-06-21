@@ -5,16 +5,16 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
+import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
-import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { FtpService, NatsService } from 'src/common';
-import { RpcException } from '@nestjs/microservices';
 import { envsFtp } from 'src/config/envs';
+import { Repository } from 'typeorm';
+import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
+import { FilteredPaginationDto } from './dto/filter-person.dto';
+import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 
 @Injectable()
 export class PersonsService {
@@ -147,14 +147,16 @@ export class PersonsService {
     }
   }
 
-  async findPersonAffiliatesWithDetails(personId: string): Promise<any> {
-    const person = await this.findOnePerson(`${personId}`, 'uuid_column');
-    const hasBeneficiaries = await this.getBeneficiaries(person.id);
+  async findPersonAffiliatesWithDetails(uuid: string): Promise<any> {
+    const person = await this.findOnePerson(`${uuid}`, 'uuid_column');
+    const [beneficiariesResult, affiliates] = await Promise.all([
+      this.getBeneficiaries(person.id, true),
+      this.findAffiliates(person.id),
+    ]);
     const features = {
       isPolice: person.personAffiliates.some((affiliate) => affiliate.type === 'affiliates'),
-      hasBeneficiaries: hasBeneficiaries.beneficiaries.length > 0,
-      hasAffiliates:
-        person.personAffiliates.filter((affiliate) => affiliate.type === 'persons').length > 0,
+      hasBeneficiaries: beneficiariesResult.beneficiaries.length > 0,
+      hasAffiliates: affiliates.length > 0,
     };
     const {
       createdAt,
@@ -199,55 +201,53 @@ export class PersonsService {
   }
 
   async findAffiliates(id: number): Promise<any> {
-    const personAffiliates = await this.findAndVerifyPersonWithRelations(
-      id,
-      'personAffiliates',
-      'persons',
-      'type',
-    );
-    const typeIds = personAffiliates.personAffiliates.map((pa) => pa.typeId);
-    const affiliates = await this.personRepository.find({
-      where: { id: In(typeIds) },
-      relations: ['personAffiliates'],
-      select: [
-        'uuidColumn',
-        'firstName',
-        'secondName',
-        'lastName',
-        'mothersLastName',
-        'identityCard',
-        'personAffiliates',
-      ],
-    });
-    const affiliatesResponse = affiliates.map((person) => {
-      const affiliateRelation = person.personAffiliates.find((pa) => pa.type === 'affiliates');
-      return {
-        uuidColumn: person.uuidColumn,
-        fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
-          .filter(Boolean)
-          .join(' '),
-        nup: affiliateRelation?.typeId ?? null,
-        identityCard: person.identityCard,
-      };
-    });
+    const affiliatesResponse = await this.personAffiliateRepository
+      .createQueryBuilder('pa')
+      .leftJoin('persons', 'p', 'p.id = pa.typeId')
+      .leftJoin(
+        'person_affiliates',
+        'paAffiliate',
+        'paAffiliate.person_id = p.id AND paAffiliate.type = :affiliateType',
+        { affiliateType: 'affiliates' },
+      )
+      .where('pa.person_id = :id', { id })
+      .andWhere('pa.type = :personType', { personType: 'persons' })
+      .select([
+        'p.uuid_column AS "uuidColumn"',
+        `CONCAT_WS(' ', p.first_name, p.second_name, p.last_name, p.mothers_last_name) AS "fullName"`,
+        'p.identity_card AS "identityCard"',
+        'pa.state AS "state"',
+        'paAffiliate.type_id AS "nup"',
+      ])
+      .orderBy('pa.state', 'DESC')
+      .getRawMany();
+
     return affiliatesResponse;
   }
 
-  async getBeneficiaries(id: number): Promise<any> {
-    const beneficiariesList = await this.personAffiliateRepository.find({
+  async getBeneficiaries(id: number, verify: boolean = false): Promise<any> {
+    const personAffiliates = await this.personAffiliateRepository.find({
       where: { typeId: id, type: 'persons' },
       relations: ['person'],
     });
-    const kinshipTypeIds = [...new Set(beneficiariesList.map((b) => b.kinshipType))];
+    if (personAffiliates.length === 0 || verify) {
+      return { serviceStatus: true, beneficiaries: personAffiliates };
+    }
+    const kinshipTypeIds = [...new Set(personAffiliates.map((b) => b.kinshipType))];
     const kinships = await this.nats.firstValue('kinships.findAllByIds', { ids: kinshipTypeIds });
-    const beneficiaries = beneficiariesList.map(({ person, kinshipType }) => ({
-      fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
-        .filter(Boolean)
-        .join(' '),
-      kinship: !kinships.serviceStatus ? kinshipType : (kinships[kinshipType].name ?? kinshipType),
-      identityCard: person.identityCard,
-      uuidColumn: person.uuidColumn,
-    }));
+    const beneficiaries = personAffiliates
+      .map(({ person, kinshipType, state }) => ({
+        fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+          .filter(Boolean)
+          .join(' '),
+        kinship: !kinships.serviceStatus
+          ? kinshipType
+          : (kinships[kinshipType].name ?? kinshipType),
+        identityCard: person.identityCard,
+        uuidColumn: person.uuidColumn,
+        state,
+      }))
+      .sort((a, b) => Number(b.state) - Number(a.state));
     return {
       serviceStatus: kinships.serviceStatus,
       beneficiaries,
@@ -389,35 +389,5 @@ export class PersonsService {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexecpected Error');
-  }
-
-  private async findAndVerifyPersonWithRelations(
-    id: number,
-    relation: string,
-    registration: string,
-    field: string,
-  ): Promise<Person | null> {
-    let person = null;
-    try {
-      person = await this.personRepository.findOne({
-        where: { id },
-        relations: [relation],
-      });
-    } catch (error) {
-      throw new RpcException({ message: error.message, code: 400 });
-    }
-    if (!person) {
-      throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
-    }
-    if (!person[relation]) {
-      throw new RpcException({ message: `campo ${relation} no existe en person`, code: 404 });
-    }
-    const filteredRelatedData = person[relation].filter(
-      (related) => related[field] === registration,
-    );
-    return {
-      ...person,
-      personAffiliates: filteredRelatedData,
-    };
   }
 }

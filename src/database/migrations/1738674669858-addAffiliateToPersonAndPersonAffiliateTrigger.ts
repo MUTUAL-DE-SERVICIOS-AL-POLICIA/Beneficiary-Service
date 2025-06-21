@@ -216,6 +216,8 @@ export class BeneficiaryAddAffiliateToPersonAndPersonAffiliateTrigger17386746698
                                 );
                             RAISE NOTICE 'Se creó persona correctamente';
                         end if;
+                    ELSIF TG_OP = 'DELETE' THEN
+                        DELETE FROM beneficiaries.persons WHERE uuid_column = OLD.uuid_reference;
                     END IF;
                 PERFORM set_config('session_replication_role', 'origin', true);
                 END IF;
@@ -232,7 +234,7 @@ export class BeneficiaryAddAffiliateToPersonAndPersonAffiliateTrigger17386746698
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-        DROP TRIGGER trg_replicate_affiliates_to_persons_and_persons_aff ON public.affiliates;    
+        DROP TRIGGER IF EXISTS trg_replicate_affiliates_to_persons_and_persons_aff ON public.affiliates;    
     `);
   }
 }
