@@ -98,14 +98,15 @@ export class AffiliatesController {
 
   @MessagePattern('affiliate.uploadChunk')
   async uploadChunk(
-    @Payload() payload: { affiliateId: string; fileDossierId: string; numberChunk: string; chunk: Buffer;},
+    @Payload()
+    payload: {
+      affiliateId: string;
+      fileDossierId: string;
+      numberChunk: string;
+      chunk: Buffer;
+    },
   ) {
-    const { affiliateId, fileDossierId,numberChunk, chunk } = payload;
-    return this.affiliatesService.uploadChunk(
-      +affiliateId,
-      +fileDossierId,
-      +numberChunk,
-      chunk,
-    );
+    const { affiliateId, fileDossierId, numberChunk, chunk } = payload;
+    return this.affiliatesService.uploadChunk(+affiliateId, +fileDossierId, +numberChunk, chunk);
   }
 }
