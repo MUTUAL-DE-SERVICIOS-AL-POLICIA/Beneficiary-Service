@@ -65,4 +65,48 @@ export class AffiliatesController {
   documentsImports(@Payload() payload: object) {
     return this.affiliatesService.documentsImports(payload);
   }
+
+  @MessagePattern('affiliate.findAllFileDossiers')
+  findAllFileDossiers() {
+    return this.affiliatesService.findAllFileDossiers();
+  }
+
+  @MessagePattern('affiliate.showFileDossiers')
+  showFileDossiers(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.showFileDossiers(affiliateId);
+  }
+
+  @MessagePattern('affiliate.findFileDossier')
+  findFileDossier(
+    @Payload('affiliateId', ParseIntPipe) affiliateId: number,
+    @Payload('fileDossierId', ParseIntPipe) fileDossierId: number,
+  ) {
+    return this.affiliatesService.findFileDossier(affiliateId, fileDossierId);
+  }
+
+  @MessagePattern('affiliate.concatChunksAndUploadFile')
+  async concatChunksAndUploadFile(
+    @Payload() payload: { affiliateId: string; fileDossierId: string; totalChunks: string },
+  ) {
+    const { affiliateId, fileDossierId, totalChunks } = payload;
+    return this.affiliatesService.concatChunksAndUploadFile(
+      +affiliateId,
+      +fileDossierId,
+      +totalChunks,
+    );
+  }
+
+  @MessagePattern('affiliate.uploadChunk')
+  async uploadChunk(
+    @Payload()
+    payload: {
+      affiliateId: string;
+      fileDossierId: string;
+      numberChunk: string;
+      chunk: Buffer;
+    },
+  ) {
+    const { affiliateId, fileDossierId, numberChunk, chunk } = payload;
+    return this.affiliatesService.uploadChunk(+affiliateId, +fileDossierId, +numberChunk, chunk);
+  }
 }
