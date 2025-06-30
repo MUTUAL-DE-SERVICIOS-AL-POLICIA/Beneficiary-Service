@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   Column,
+  JoinColumn,
 } from 'typeorm';
 import { Affiliate } from './';
 
@@ -14,7 +15,10 @@ export class AffiliateDocument {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column()
+  affiliateId: number;
   @ManyToOne(() => Affiliate, (affiliate) => affiliate.affiliateDocuments)
+  @JoinColumn({ name: 'affiliate_id' })
   affiliate: Affiliate;
 
   @Column()
