@@ -85,7 +85,7 @@ export class AffiliatesService {
 
     const initialPath = `${envsFtp.ftpDocuments}/${affiliateId}/`;
 
-    if (document.serviceStatus === false){
+    if (document.serviceStatus === false) {
       return {
         serviceStatus: document.serviceStatus,
         message: document.message || 'Servicio de documentos no disponible',
@@ -160,7 +160,6 @@ export class AffiliatesService {
   }
 
   async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
-
     const [documents] = await Promise.all([
       this.affiliateDocumentsRepository.find({
         where: {
@@ -551,7 +550,6 @@ export class AffiliatesService {
     fileDossierId: number,
     totalChunks: number,
   ): Promise<{ serviceStatus: boolean; message: string }> {
-
     const [fileDossier, affiliateFileDossiers] = await Promise.all([
       this.nats.firstValue('fileDossiers.findOne', { id: fileDossierId }),
       this.affiliateFileDossierRepository.find({
