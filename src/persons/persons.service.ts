@@ -9,10 +9,10 @@ import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FtpService, NatsService } from 'src/common';
+import { NatsService } from 'src/common';
 import { envsFtp } from 'src/config/envs';
 import { Repository } from 'typeorm';
-import { CreatePersonDto, CreatePersonFingerprintDto, UpdatePersonDto } from './dto';
+import { CreatePersonDto, UpdatePersonDto } from './dto';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 
@@ -30,7 +30,6 @@ export class PersonsService {
     @InjectRepository(PersonAffiliate)
     private readonly personAffiliateRepository: Repository<PersonAffiliate>,
     private readonly nats: NatsService,
-    private readonly ftp: FtpService,
   ) {}
   async create(createPersonDto: CreatePersonDto) {
     try {
@@ -253,21 +252,15 @@ export class PersonsService {
       beneficiaries,
     };
   }
-  async createPersonFingerPrint(
-    createPersonFingerprintDto: CreatePersonFingerprintDto,
-  ): Promise<{ message: string; registros: { success: string[]; error: string[] } }> {
-    const { personId, fingerprints } = createPersonFingerprintDto;
+  async createPersonFingerPrint(personId: number, personFingerprints: any[]): Promise<any> {
+    const person = await this.findOnePerson(`${personId}`, 'id');
+    const uploadFiles: any[] = [];
+    const removeFiles: string[] = [];
 
-    const [person] = await Promise.all([
-      this.findOnePerson(`${personId}`, 'id'),
-      this.ftp.connectToFtp(),
-    ]);
-
-    const uploadResults = await fingerprints.reduce(
+    const uploadResults = await personFingerprints.reduce(
       async (accPromise, fingerprint) => {
         const acc = await accPromise;
-        const { wsq, quality, fingerprintTypeId } = fingerprint;
-        const buffer = Buffer.from(wsq, 'base64');
+        const { quality, fingerprintTypeId } = fingerprint;
         const personFingerprints = await this.personFingerprintRepository.find({
           where: { person: { id: personId }, fingerprintType: { id: fingerprintTypeId } },
           relations: ['fingerprintType'],
@@ -286,7 +279,6 @@ export class PersonsService {
             throw new RpcException(`Tipo de huella con ID ${fingerprintTypeId} no encontrado`);
           }
           const path = `${initialPath}${fingerprintType.short_name}_${quality}.wsq`;
-          await this.ftp.uploadFile(buffer, initialPath, path);
           const newPersonFingerprint = this.personFingerprintRepository.create({
             person,
             quality,
@@ -294,6 +286,7 @@ export class PersonsService {
             path,
           });
           await this.personFingerprintRepository.save(newPersonFingerprint);
+          uploadFiles.push({ fileId: fingerprintTypeId, path });
           acc.success.push(`Huella registrada con calidad ${quality}: ${path}`);
           return acc;
         }
@@ -302,14 +295,14 @@ export class PersonsService {
           personFingerprints[0],
         );
         if (quality > fingerprintMinQuality.quality) {
-          const remove_path = fingerprintMinQuality.path;
+          const removePath: string = fingerprintMinQuality.path;
           const fingerprintType = fingerprintMinQuality.fingerprintType;
           fingerprintMinQuality.quality = quality;
           fingerprintMinQuality.path = `${initialPath}${fingerprintType.short_name}_${quality}.wsq`;
           fingerprintMinQuality.updatedAt = new Date();
-          await this.ftp.removeFile(remove_path);
-          await this.ftp.uploadFile(buffer, initialPath, fingerprintMinQuality.path);
           await this.personFingerprintRepository.save(fingerprintMinQuality);
+          removeFiles.push(removePath);
+          uploadFiles.push({ fileId: fingerprintTypeId, path: fingerprintMinQuality.path });
           acc.success.push(
             `Huella reemplazada con calidad ${quality}: ${fingerprintMinQuality.path}`,
           );
@@ -330,13 +323,15 @@ export class PersonsService {
     } else {
       message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente.`;
     }
-    await this.ftp.onDestroy();
+
     return {
       message,
       registros: {
         success: uploadResults.success,
         error: uploadResults.error,
       },
+      uploadFiles,
+      removeFiles,
     };
   }
 
@@ -352,37 +347,20 @@ export class PersonsService {
     return { fingerprints };
   }
 
-  async getFingerprintComparison(personId: number): Promise<any> {
-    const person = await this.findOnePerson(`${personId}`, 'id');
-    if (person.personFingerprints.length === 0) {
-      throw new RpcException({
-        message: `Person with ID: ${personId} not found`,
-        code: 404,
-      });
-    }
-    const fingerprintsData = [];
-    try {
-      await this.ftp.connectToFtp();
-      for (const fingerprint of person.personFingerprints) {
-        try {
-          console.log(`Processing fingerprint ID: ${fingerprint.id}`);
-          const fileBuffer = await this.ftp.downloadFile(fingerprint.path);
-          const wsqBase64 = fileBuffer.toString('base64');
-          fingerprintsData.push({
-            id: fingerprint.id,
-            quality: fingerprint.quality,
-            fingerprintType: fingerprint.fingerprintType,
-            wsqBase64,
-          });
-        } catch (error) {
-          console.error(`Failed to download file at path: ${fingerprint.path}`, error);
-          throw new Error(`Failed to download file at path: ${fingerprint.path}`);
-        }
-      }
-    } finally {
-      await this.ftp.onDestroy();
-    }
-    return fingerprintsData;
+  async getFingerprints(personId: number, columns?: string[]): Promise<any> {
+    const columnsToSelect =
+      columns && columns.length > 0
+        ? columns.map((col) => `pf.${col}`)
+        : this.personFingerprintRepository.metadata.columns.map((col) => `pf.${col.propertyName}`);
+
+    const fingerprints = await this.personFingerprintRepository
+      .createQueryBuilder('pf')
+      .select(columnsToSelect)
+      .leftJoinAndSelect('pf.fingerprintType', 'ft')
+      .where('pf.person_id = :personId', { personId })
+      .getMany();
+
+    return fingerprints;
   }
 
   private handleDBException(error: any) {

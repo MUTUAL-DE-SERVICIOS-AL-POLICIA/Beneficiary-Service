@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
 
 export class AddTableAffiliateFileDossiers1750251618160 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -48,9 +48,24 @@ export class AddTableAffiliateFileDossiers1750251618160 implements MigrationInte
       }),
       true,
     );
+
+    await queryRunner.createForeignKey(
+      'beneficiaries.affiliate_file_dossiers',
+      new TableForeignKey({
+        name: 'FK_affiliate_file_dossiers_affiliates',
+        columnNames: ['affiliate_id'],
+        referencedColumnNames: ['id'],
+        referencedTableName: 'beneficiaries.affiliates',
+        onDelete: 'RESTRICT',
+      }),
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.dropForeignKey(
+      'beneficiaries.affiliate_file_dossiers',
+      'FK_affiliate_file_dossiers_affiliates',
+    );
     await queryRunner.dropTable('beneficiaries.affiliate_file_dossiers', true);
   }
 }

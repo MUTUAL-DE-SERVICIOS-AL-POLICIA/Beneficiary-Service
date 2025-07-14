@@ -4,7 +4,6 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
-import { CreatePersonFingerprintDto } from './dto';
 
 @Controller('persons')
 export class PersonsController {
@@ -51,11 +50,8 @@ export class PersonsController {
   }
 
   @MessagePattern('person.createPersonFingerprint')
-  async createPersonFingerprint(
-    @Payload()
-    createreatePersonFingerprint: CreatePersonFingerprintDto,
-  ) {
-    return this.personsService.createPersonFingerPrint(createreatePersonFingerprint);
+  async createPersonFingerprint(data: { personId: number; personFingerprints: any[] }) {
+    return this.personsService.createPersonFingerPrint(data.personId, data.personFingerprints);
   }
 
   @MessagePattern('person.showFingerprintRegistered')
@@ -68,8 +64,8 @@ export class PersonsController {
     return this.personsService.showListFingerprint();
   }
 
-  @MessagePattern('person.getFingerprintComparison')
-  async getFingerprintComparison(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.getFingerprintComparison(id);
+  @MessagePattern('person.getFingerprints')
+  async getFingerprints(data: { id: number; columns?: string[] }) {
+    return this.personsService.getFingerprints(data.id, data.columns);
   }
 }

@@ -1,6 +1,6 @@
-import { Controller, Get, Query, ParseIntPipe, UsePipes } from '@nestjs/common';
+import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
 import { AffiliatesService } from './affiliates.service';
-import { PaginationDto, FileRequiredPipe } from 'src/common';
+import { PaginationDto } from 'src/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 @Controller('affiliates')
 export class AffiliatesController {
@@ -22,16 +22,11 @@ export class AffiliatesController {
   }
 
   @MessagePattern('affiliate.createOrUpdateDocument')
-  @UsePipes(new FileRequiredPipe())
   async createOrUpdateDocument(
-    @Payload() payload: { affiliateId: string; procedureDocumentId: string; documentPdf: Buffer },
+    @Payload() payload: { affiliateId: string; procedureDocumentId: string },
   ) {
-    const { affiliateId, procedureDocumentId, documentPdf } = payload;
-    return this.affiliatesService.createOrUpdateDocument(
-      +affiliateId,
-      +procedureDocumentId,
-      documentPdf,
-    );
+    const { affiliateId, procedureDocumentId } = payload;
+    return this.affiliatesService.createOrUpdateDocument(+affiliateId, +procedureDocumentId);
   }
 
   @MessagePattern('affiliate.showDocuments')
@@ -71,6 +66,11 @@ export class AffiliatesController {
     return this.affiliatesService.findAllFileDossiers();
   }
 
+  @MessagePattern('affiliate.findAllDocuments')
+  findAllDocuments() {
+    return this.affiliatesService.findAllDocuments();
+  }
+
   @MessagePattern('affiliate.showFileDossiers')
   showFileDossiers(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
     return this.affiliatesService.showFileDossiers(affiliateId);
@@ -84,29 +84,19 @@ export class AffiliatesController {
     return this.affiliatesService.findFileDossier(affiliateId, fileDossierId);
   }
 
-  @MessagePattern('affiliate.concatChunksAndUploadFile')
-  async concatChunksAndUploadFile(
-    @Payload() payload: { affiliateId: string; fileDossierId: string; totalChunks: string },
+  @MessagePattern('affiliate.createOrUpdateFileDossier')
+  async createOrUpdateFileDossier(
+    @Payload() payload: { affiliateId: string; fileDossierId: string },
   ) {
-    const { affiliateId, fileDossierId, totalChunks } = payload;
-    return this.affiliatesService.concatChunksAndUploadFile(
-      +affiliateId,
-      +fileDossierId,
-      +totalChunks,
-    );
+    const { affiliateId, fileDossierId } = payload;
+    return this.affiliatesService.createOrUpdateFileDossier(+affiliateId, +fileDossierId);
   }
 
-  @MessagePattern('affiliate.uploadChunk')
-  async uploadChunk(
-    @Payload()
-    payload: {
-      affiliateId: string;
-      fileDossierId: string;
-      numberChunk: string;
-      chunk: Buffer;
-    },
+  @MessagePattern('affiliate.deleteFileDossier')
+  deleteFileDossier(
+    @Payload('affiliateId', ParseIntPipe) affiliateId: number,
+    @Payload('fileDossierId', ParseIntPipe) fileDossierId: number,
   ) {
-    const { affiliateId, fileDossierId, numberChunk, chunk } = payload;
-    return this.affiliatesService.uploadChunk(+affiliateId, +fileDossierId, +numberChunk, chunk);
+    return this.affiliatesService.deleteFileDossier(affiliateId, fileDossierId);
   }
 }
