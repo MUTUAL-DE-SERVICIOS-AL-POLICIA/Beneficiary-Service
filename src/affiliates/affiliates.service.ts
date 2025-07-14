@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PaginationDto, FtpService, NatsService } from 'src/common';
+import { PaginationDto, NatsService } from 'src/common';
 import { Repository } from 'typeorm';
 import { Affiliate, AffiliateDocument, AffiliateFileDossier } from './entities';
 import { RpcException } from '@nestjs/microservices';
@@ -18,7 +18,6 @@ export class AffiliatesService {
     private readonly affiliateDocumentsRepository: Repository<AffiliateDocument>,
     @InjectRepository(AffiliateFileDossier)
     private readonly affiliateFileDossierRepository: Repository<AffiliateFileDossier>,
-    private readonly ftp: FtpService,
     private readonly nats: NatsService,
     private readonly dataSource: DataSource,
   ) {}
@@ -67,11 +66,7 @@ export class AffiliatesService {
     };
   }
 
-  async createOrUpdateDocument(
-    affiliateId: number,
-    procedureDocumentId: number,
-    documentPdf: Buffer,
-  ): Promise<{ serviceStatus: boolean; message: string }> {
+  async createOrUpdateDocument(affiliateId: number, procedureDocumentId: number): Promise<any> {
     const [document, affiliate] = await Promise.all([
       this.nats.firstValue('procedureDocuments.findOne', { id: procedureDocumentId }),
       this.findAndVerifyAffiliateWithRelationOneCondition(
@@ -80,7 +75,6 @@ export class AffiliatesService {
         'procedureDocumentId',
         procedureDocumentId,
       ),
-      this.ftp.connectToFtp(),
     ]);
 
     const initialPath = `${envsFtp.ftpDocuments}/${affiliateId}/`;
@@ -108,23 +102,32 @@ export class AffiliatesService {
 
     affiliateDocument.path = `${initialPath}${document.shortened ?? document.name}.pdf`;
 
-    await Promise.all([
-      this.affiliateDocumentsRepository.save(affiliateDocument),
-      this.ftp.uploadFile(documentPdf, initialPath, affiliateDocument.path),
-    ]);
+    const affiliateDocuments = [
+      {
+        fileId: affiliateDocument.procedureDocumentId,
+        path: affiliateDocument.path,
+      },
+    ];
 
-    this.ftp.onDestroy();
+    affiliate.affiliateDocuments.push(affiliateDocument);
+
+    await this.affiliateDocumentsRepository.save(affiliateDocument);
 
     return {
       serviceStatus: document.serviceStatus,
       message: `${document.name} ${response} exitosamente`,
+      affiliateDocuments,
     };
   }
 
   async showDocuments(affiliateId: number): Promise<any> {
-    const { affiliateDocuments } = await this.findAndVerifyAffiliateWithRelations(affiliateId, [
-      'affiliateDocuments',
-    ]);
+    const affiliateDocuments = await this.affiliateDocumentsRepository.find({
+      where: { affiliateId },
+      order: {
+        procedureDocumentId: 'ASC',
+      },
+    });
+
     if (!affiliateDocuments.length) return affiliateDocuments;
 
     const procedureDocumentIds = affiliateDocuments.map(
@@ -159,27 +162,20 @@ export class AffiliatesService {
     return { serviceStatus: documentNames.serviceStatus, documentsAffiliate };
   }
 
-  async findDocument(affiliateId: number, procedureDocumentId: number): Promise<Buffer> {
-    const [documents] = await Promise.all([
-      this.affiliateDocumentsRepository.find({
-        where: {
-          affiliateId,
-          procedureDocumentId,
-        },
-      }),
-      this.ftp.connectToFtp(),
-    ]);
+  async findDocument(
+    affiliateId: number,
+    procedureDocumentId: number,
+  ): Promise<AffiliateDocument[]> {
+    const affiliateDocuments = await this.affiliateDocumentsRepository.find({
+      where: {
+        affiliateId,
+        procedureDocumentId,
+      },
+    });
 
-    if (documents.length === 0)
+    if (affiliateDocuments.length === 0)
       throw new RpcException({ message: 'Document not found', code: 404 });
-
-    const firstDocument = documents[0];
-
-    const documentDownload = await this.ftp.downloadFile(firstDocument.path);
-
-    this.ftp.onDestroy();
-
-    return documentDownload;
+    return affiliateDocuments;
   }
 
   async collateDocuments(affiliateId: number, modalityId: number): Promise<any> {
@@ -280,8 +276,9 @@ export class AffiliatesService {
     const dataValid = {};
     const dataValidReal = [];
 
-    await this.ftp.connectToFtp();
-    const { affiliateIds, nonNumericIds } = (await this.ftp.listFiles(path)).reduce(
+    await this.nats.firstValue('ftp.connectSwitch', { value: 'true' });
+    const { data } = await this.nats.firstValue('ftp.listFiles', { path: path });
+    const { affiliateIds, nonNumericIds } = data.reduce(
       (result, file) => {
         const isOnlyNumbers = file.name.match(/^\d+$/);
         if (isOnlyNumbers) {
@@ -319,7 +316,8 @@ export class AffiliatesService {
     for (const affiliateId of validAffiliates) {
       const pathFile = `${path}/${affiliateId.id}`;
 
-      const files = await this.ftp.listFiles(pathFile);
+      const { data } = await this.nats.firstValue('ftp.listFiles', { path: pathFile });
+      const files = data;
       const documentsOriginal = files.map((file) => `'${file.name.replace(/"/g, '')}'`);
       const documents = files.map(
         (file) => `'${file.name.replace(/"/g, '').replace(/\.pdf$/i, '')}'`,
@@ -349,9 +347,7 @@ export class AffiliatesService {
     if (notExistFiles) {
       throw new RpcException({ message: 'No existen Archivos en las Carpetas', code: 404 });
     }
-
-    await this.ftp.onDestroy();
-
+    await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
     let totalThumbs: number = 0;
 
     for (const affiliateId in dataRead) {
@@ -423,7 +419,7 @@ export class AffiliatesService {
   }
 
   async documentsImports(data: any): Promise<any> {
-    await this.ftp.connectToFtp();
+    await this.nats.firstValue('ftp.connectSwitch', { value: 'true' });
     const Archivos_validos_reales_Existentes = data.dataValidRealExist;
     const Archivos_validos_reales_No_Existentes = data.dataValidRealNotExist;
 
@@ -434,7 +430,10 @@ export class AffiliatesService {
       const insertsNew: string[] = [];
       try {
         for (const file of Archivos_validos_reales_No_Existentes) {
-          await this.ftp.renameFile(file.oldPath, file.newPath);
+          await this.nats.firstValue('ftp.renameFile', {
+            oldPath: file.oldPath,
+            newPath: file.newPath,
+          });
           insertsNew.push(
             `(${file.affiliate_id}, ${file.procedure_document_id}, '${file.newPath}')`,
           );
@@ -449,7 +448,10 @@ export class AffiliatesService {
         }
 
         for (const file of Archivos_validos_reales_Existentes) {
-          await this.ftp.renameFile(file.oldPath, file.newPath);
+          await this.nats.firstValue('ftp.renameFile', {
+            oldPath: file.oldPath,
+            newPath: file.newPath,
+          });
 
           const queryExist = `
             UPDATE beneficiaries.affiliate_documents
@@ -467,7 +469,7 @@ export class AffiliatesService {
       this.logger.log(`Archivos existentes actualizados: ${contExistFiles}`);
     });
 
-    await this.ftp.onDestroy();
+    await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
 
     return {
       totalFolder: data.totalFolder,
@@ -479,8 +481,9 @@ export class AffiliatesService {
 
   async showFileDossiers(affiliateId: number): Promise<any> {
     const affiliateFileDossiers = await this.affiliateFileDossierRepository.find({
-      where: {
-        affiliateId,
+      where: { affiliateId },
+      order: {
+        fileDossierId: 'ASC',
       },
     });
 
@@ -524,32 +527,27 @@ export class AffiliatesService {
     return this.nats.firstValue('fileDossiers.findAll', ['id', 'name', 'shortened']);
   }
 
-  async findFileDossier(affiliateId: number, fileDossierId: number): Promise<Buffer> {
-    const [fileDossiers] = await Promise.all([
-      this.affiliateFileDossierRepository.find({
-        where: {
-          affiliateId,
-          fileDossierId,
-        },
-      }),
-      this.ftp.connectToFtp(),
-    ]);
-
-    if (fileDossiers.length === 0)
-      throw new RpcException({ message: 'Dossier not found', code: 404 });
-
-    const fileDossierDownload = await this.ftp.downloadFile(fileDossiers[0].path);
-
-    this.ftp.onDestroy();
-
-    return fileDossierDownload;
+  async findAllDocuments() {
+    return this.nats.firstValue('procedureDocuments.findAll', ['id', 'name', 'shortened']);
   }
 
-  async concatChunksAndUploadFile(
+  async findFileDossier(
     affiliateId: number,
     fileDossierId: number,
-    totalChunks: number,
-  ): Promise<{ serviceStatus: boolean; message: string }> {
+  ): Promise<AffiliateFileDossier[]> {
+    const AffiliateFileDossier = await this.affiliateFileDossierRepository.find({
+      where: {
+        affiliateId,
+        fileDossierId,
+      },
+    });
+    if (AffiliateFileDossier.length === 0)
+      throw new RpcException({ message: 'Dossier not found', code: 404 });
+
+    return AffiliateFileDossier;
+  }
+
+  async createOrUpdateFileDossier(affiliateId: number, fileDossierId: number): Promise<any> {
     const [fileDossier, affiliateFileDossiers] = await Promise.all([
       this.nats.firstValue('fileDossiers.findOne', { id: fileDossierId }),
       this.affiliateFileDossierRepository.find({
@@ -558,11 +556,9 @@ export class AffiliatesService {
           fileDossierId,
         },
       }),
-      this.ftp.connectToFtp(),
     ]);
 
     const initialPath = `${envsFtp.ftpFileDossiers}/${affiliateId}/`;
-    const nameInitial = `${affiliateId}-${fileDossierId}`;
     if (fileDossier.serviceStatus === false) {
       return {
         serviceStatus: fileDossier.serviceStatus,
@@ -586,36 +582,38 @@ export class AffiliatesService {
 
     affiliateFileDossier.path = `${initialPath}${fileDossier.shortened ?? fileDossier.name}.pdf`;
 
-    await Promise.all([
-      this.affiliateFileDossierRepository.save(affiliateFileDossier),
-      this.ftp.concatChunks(totalChunks, nameInitial, initialPath, affiliateFileDossier.path),
-    ]);
+    const fileDossiers = [
+      {
+        fileId: affiliateFileDossier.fileDossierId,
+        path: affiliateFileDossier.path,
+      },
+    ];
 
-    this.ftp.onDestroy();
-
+    await this.affiliateFileDossierRepository.save(affiliateFileDossier);
     return {
       serviceStatus: fileDossier.serviceStatus,
       message: `${fileDossier.name} ${response} exitosamente`,
+      affiliateFileDossiers: fileDossiers,
     };
   }
 
-  async uploadChunk(
-    affiliateId: number,
-    fileDossierId: number,
-    numberChunk: number,
-    chunk: Buffer,
-  ): Promise<{ serviceStatus: boolean; message: string }> {
-    await this.ftp.connectToFtp();
+  async deleteFileDossier(affiliateId: number, fileDossierId: number): Promise<any> {
+    const fileDossiers = await this.affiliateFileDossierRepository.find({
+      where: { affiliateId, fileDossierId },
+      select: ['path'],
+    });
 
-    const name = `${affiliateId}-${fileDossierId}-${numberChunk}`;
-    await this.ftp.uploadChunk(chunk, name);
+    if (fileDossiers.length === 0)
+      return {
+        paths: [],
+        message: 'No existe el expediente para eliminar',
+      };
 
-    await this.ftp.onDestroy();
+    const paths = fileDossiers.map((f) => f.path);
 
-    return {
-      serviceStatus: true,
-      message: `exitosamente`,
-    };
+    await this.affiliateFileDossierRepository.delete({ affiliateId, fileDossierId });
+
+    return { paths, message: 'Expediente eliminado exitosamente' };
   }
 
   private async findAndVerifyAffiliateWithRelations(
