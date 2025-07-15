@@ -9,7 +9,7 @@ export class BeneficiaryPersonRelations1732890554525 implements MigrationInterfa
         columnNames: ['person_id'],
         referencedTableName: 'beneficiaries.persons',
         referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
+        onDelete: 'RESTRICT',
       }),
     );
 
@@ -19,14 +19,14 @@ export class BeneficiaryPersonRelations1732890554525 implements MigrationInterfa
         columnNames: ['person_id'],
         referencedTableName: 'beneficiaries.persons',
         referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
+        onDelete: 'RESTRICT',
       }),
       new TableForeignKey({
         name: 'FK_fingerprint_fingerprint_type',
         columnNames: ['fingerprint_type_id'],
         referencedTableName: 'beneficiaries.fingerprint_types',
         referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
+        onDelete: 'RESTRICT',
       }),
     ]);
   }

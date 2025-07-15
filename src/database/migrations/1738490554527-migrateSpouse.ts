@@ -19,7 +19,7 @@ export class MigrateSpouse1738490554527 implements MigrationInterface {
         duplicate_record INT := 0;
         updated_count INTEGER;
     BEGIN 
-        FOR campo IN ( SELECT * FROM spouses )
+        FOR campo IN ( SELECT * FROM spouses order by id )
         LOOP
             BEGIN
             total_count := total_count + 1;

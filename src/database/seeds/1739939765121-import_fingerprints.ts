@@ -1,6 +1,8 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { FtpService } from 'src/common';
+import { ClientProxyFactory, Transport, ClientProxy } from '@nestjs/microservices';
+import { NatsService } from 'src/common';
+import { NastEnvs } from 'src/config';
 
 export class BeneficiaryImportFingerprints implements Seeder {
   track = true;
@@ -33,13 +35,19 @@ export class BeneficiaryImportFingerprints implements Seeder {
 
   public async run(dataSource: DataSource): Promise<any> {
     console.log('Ejecutando BeneficiaryImportFingerprints');
-    const ftp = new FtpService();
-    const path = 'pvt/Person/Fingerprints';
+    const path = 'Person/Fingerprints';
 
-    await ftp.connectToFtp();
-    //console.log(await ftp.listFiles(path));
+    const client: ClientProxy = ClientProxyFactory.create({
+      transport: Transport.NATS,
+      options: {
+        servers: NastEnvs.natsServers,
+      },
+    });
+    const nats = new NatsService(client);
 
-    const { personIds } = (await ftp.listFiles(path)).reduce(
+    await nats.firstValue('ftp.connectSwitch', { value: 'true' });
+    const { data } = await nats.firstValue('ftp.listFiles', { path });
+    const { personIds } = data.reduce(
       (result, file) => {
         const isOnlyNumbers = file.name.match(/^\d+$/);
         if (isOnlyNumbers) {
@@ -59,7 +67,9 @@ export class BeneficiaryImportFingerprints implements Seeder {
       const inserts = [];
       for (const personId of validAffiliates) {
         const pathFile = `${path}/${personId.id}`;
-        const files = await ftp.listFiles(pathFile);
+
+        const filesCore = await nats.firstValue('ftp.listFiles', { path: pathFile });
+        const files = await filesCore.data;
         files.forEach(async (file) => {
           const res = this.separarNombreYNumero(file.name);
           const body = {
@@ -79,7 +89,7 @@ export class BeneficiaryImportFingerprints implements Seeder {
       );
       console.log(cont + ' huellas registradas en base de datos');
     });
-    await ftp.onDestroy();
+    await nats.firstValue('ftp.connectSwitch', { value: 'false' });
   }
 }
 

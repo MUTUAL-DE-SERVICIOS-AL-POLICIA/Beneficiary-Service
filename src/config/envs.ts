@@ -17,6 +17,7 @@ interface EnvVars {
   FTP_SSL: boolean;
   FTP_FINGERPRINTS: string;
   FTP_DOCUMENTS: string;
+  FTP_FILE_DOSSIERS: string;
   FTP_IMPORT_DOCUMENTS_PVTBE: string;
 }
 
@@ -77,5 +78,6 @@ export const envsFtp = {
   ftpSsl: envVars.FTP_SSL,
   ftpFingerprints: envVars.FTP_FINGERPRINTS,
   ftpDocuments: envVars.FTP_DOCUMENTS,
+  ftpFileDossiers: envVars.FTP_FILE_DOSSIERS,
   ftpImportDocumentsPvtbe: envVars.FTP_IMPORT_DOCUMENTS_PVTBE,
 };

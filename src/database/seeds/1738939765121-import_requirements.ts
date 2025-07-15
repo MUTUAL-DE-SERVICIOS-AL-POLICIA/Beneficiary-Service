@@ -1,11 +1,13 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { FtpService } from 'src/common';
+import { NatsService } from 'src/common';
 import * as readline from 'readline';
 import { envsFtp } from 'src/config/envs';
+import { ClientProxyFactory, Transport, ClientProxy } from '@nestjs/microservices';
+import { NastEnvs } from 'src/config';
 
 export class BeneficiaryImportRequirements implements Seeder {
-  track = true;
+  //track = true;
   async promptUser(question: string): Promise<string> {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -22,7 +24,14 @@ export class BeneficiaryImportRequirements implements Seeder {
 
   public async run(dataSource: DataSource): Promise<any> {
     console.log('Ejecutando BeneficiaryImportRequirements');
-    const ftp = new FtpService();
+    const client: ClientProxy = ClientProxyFactory.create({
+      transport: Transport.NATS,
+      options: {
+        servers: NastEnvs.natsServers,
+      },
+    });
+    const nats = new NatsService(client);
+
     const path = envsFtp.ftpDocuments;
 
     const initialFolder: {
@@ -46,9 +55,9 @@ export class BeneficiaryImportRequirements implements Seeder {
     const dataRead = {};
     const dataValid = {};
     const dataValidReal = {};
-
-    await ftp.connectToFtp();
-    const { affiliateIds, nonNumericIds } = (await ftp.listFiles(path)).reduce(
+    await nats.firstValue('ftp.connectSwitch', { value: 'true' });
+    const filesCore = await nats.firstValue('ftp.listFiles', { path: path });
+    const { affiliateIds, nonNumericIds } = filesCore.data.reduce(
       (result, file) => {
         const isOnlyNumbers = file.name.match(/^\d+$/);
         if (isOnlyNumbers) {
@@ -74,8 +83,8 @@ export class BeneficiaryImportRequirements implements Seeder {
 
     for (const affiliateId of validAffiliates) {
       const pathFile = `${path}/${affiliateId.id}`;
-
-      const files = await ftp.listFiles(pathFile);
+      const { data } = await nats.firstValue('ftp.listFiles', { path: pathFile });
+      const files = data;
       const documentsOriginal = files.map((file) => `'${file.name.replace(/"/g, '')}'`);
       const documents = files.map(
         (file) => `'${file.name.replace(/"/g, '').replace(/\.pdf$/i, '')}'`,
@@ -135,8 +144,7 @@ export class BeneficiaryImportRequirements implements Seeder {
     }
 
     initialFolder.filesValidFolder -= totalThumbs;
-
-    await ftp.onDestroy();
+    await nats.firstValue('ftp.connectSwitch', { value: 'false' });
     console.log('Lectura de carpetas:');
     console.log('Total Carpetas: ', initialFolder.totalFolder);
     console.log('Carpetas leídas:', initialFolder.readFolder);
@@ -174,6 +182,4 @@ export class BeneficiaryImportRequirements implements Seeder {
     });
   }
 }
-
-//yarn seed:create --name src/database/seeds/import_requirements.ts
-//yarn seed:run --name src/database/seeds/1730293751153-import_requirements.ts
+//yarn seed:run --name src/database/seeds/1738939765121-import_requirements.ts
