@@ -10,25 +10,15 @@ interface EnvVars {
   DB_USERNAME: string;
   DB_SYNCHRONIZE: boolean;
   DB_SCHEMA: string;
-  FTP_HOST: string;
-  FTP_USERNAME: string;
-  FTP_PASSWORD: string;
-  FTP_ROOT: string;
-  FTP_SSL: boolean;
-  FTP_FINGERPRINTS: string;
-  FTP_DOCUMENTS: string;
-  FTP_IMPORT_DOCUMENTS_PVTBE: string;
+  PATH_FTP_FINGERPRINTS: string;
+  PATH_FTP_DOCUMENTS: string;
+  PATH_FTP_FILE_DOSSIERS: string;
+  PATH_FTP_IMPORT_DOCUMENTS_PVTBE: string;
 }
 
 const envsSchema = joi
   .object({
     NATS_SERVERS: joi.array().items(joi.string()).required(),
-
-    FTP_HOST: joi.string(),
-    FTP_USERNAME: joi.string(),
-    FTP_PASSWORD: joi.string(),
-    FTP_ROOT: joi.string(),
-    FTP_SSL: joi.boolean(),
 
     DB_PASSWORD: joi.string().required(),
     DB_DATABASE: joi.string().required(),
@@ -70,12 +60,8 @@ export const DbEnvs = {
 };
 
 export const envsFtp = {
-  ftpHost: envVars.FTP_HOST,
-  ftpUsername: envVars.FTP_USERNAME,
-  ftpPassword: envVars.FTP_PASSWORD,
-  ftpRoot: envVars.FTP_ROOT,
-  ftpSsl: envVars.FTP_SSL,
-  ftpFingerprints: envVars.FTP_FINGERPRINTS,
-  ftpDocuments: envVars.FTP_DOCUMENTS,
-  ftpImportDocumentsPvtbe: envVars.FTP_IMPORT_DOCUMENTS_PVTBE,
+  ftpFingerprints: envVars.PATH_FTP_FINGERPRINTS,
+  ftpDocuments: envVars.PATH_FTP_DOCUMENTS,
+  ftpFileDossiers: envVars.PATH_FTP_FILE_DOSSIERS,
+  ftpImportDocumentsPvtbe: envVars.PATH_FTP_IMPORT_DOCUMENTS_PVTBE,
 };

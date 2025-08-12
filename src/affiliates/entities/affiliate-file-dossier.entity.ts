@@ -10,19 +10,19 @@ import {
 } from 'typeorm';
 import { Affiliate } from './';
 
-@Entity({ schema: 'beneficiaries', name: 'affiliate_documents' })
-export class AffiliateDocument {
+@Entity({ schema: 'beneficiaries', name: 'affiliate_file_dossiers' })
+export class AffiliateFileDossier {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
   affiliateId: number;
-  @ManyToOne(() => Affiliate, (affiliate) => affiliate.affiliateDocuments)
+  @ManyToOne(() => Affiliate, (affiliate) => affiliate.affiliateFileDossiers)
   @JoinColumn({ name: 'affiliate_id' })
   affiliate: Affiliate;
 
   @Column()
-  procedureDocumentId: number;
+  fileDossierId: number;
 
   @Column()
   path: string;

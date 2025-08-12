@@ -9,7 +9,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { AffiliateDocument, AffiliateState } from './';
+import { AffiliateDocument, AffiliateState, AffiliateFileDossier } from './';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliates' })
 export class Affiliate {
@@ -72,6 +72,9 @@ export class Affiliate {
 
   @OneToMany(() => AffiliateDocument, (affiliateDocuments) => affiliateDocuments.affiliate)
   affiliateDocuments: AffiliateDocument[];
+
+  @OneToMany(() => AffiliateFileDossier, (affiliateFileDossiers) => affiliateFileDossiers.affiliate)
+  affiliateFileDossiers: AffiliateFileDossier[];
 
   @ManyToOne(() => AffiliateState, (affiliateState) => affiliateState.affiliates)
   @JoinColumn({ name: 'affiliate_state_id' })
