@@ -130,11 +130,6 @@ export class Person {
   @OneToMany(() => PersonFingerprint, (personFingerprint) => personFingerprint.person)
   personFingerprints: PersonFingerprint[];
 
-  @Column('date', {
-    nullable: true,
-  })
-  dateLastContribution: Date;
-
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
