@@ -167,7 +167,6 @@ export class PersonsService {
       financialEntityId,
       nua,
       idPersonSenasir,
-      dateLastContribution,
       personAffiliates,
       ...dataPerson
     } = person;
