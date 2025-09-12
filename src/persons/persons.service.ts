@@ -36,13 +36,12 @@ export class PersonsService {
     identityCard: string,
     cellphone: string,
     isRegisterCellphone: boolean,
+    directAccess: boolean,
   ): Promise<any> {
     const messageCellphone = 'Número de teléfono no registrado para esta persona.';
-
     const person = await this.personRepository.findOne({
       where: { identityCard },
     });
-
     if (!person) {
       return {
         validateStatus: false,
@@ -57,8 +56,6 @@ export class PersonsService {
       };
     }
 
-    const normalizedInput = cellphone.replace(/[()\s-]/g, '').replace(/^591/, '');
-
     let registeredNumbers: string[] = [];
 
     if (person.cellPhoneNumber != null) {
@@ -70,6 +67,11 @@ export class PersonsService {
       );
     }
 
+    if(directAccess && registeredNumbers.length > 0) {
+      cellphone = registeredNumbers[0];
+    }
+
+    const normalizedInput = cellphone.replace(/[()\s-]/g, '').replace(/^591/, '');
     const exists = registeredNumbers.some((num) => num === normalizedInput);
 
     if (isRegisterCellphone && !exists) {
