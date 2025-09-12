@@ -10,99 +10,129 @@ export class UpdateTriggers1756407139523 implements MigrationInterface {
         RETURNS trigger AS $$
         DECLARE
             new_person_id BIGINT;
+			found_person_uuid UUID;
         BEGIN
             -- Evitar bucles de replicación
             IF current_setting('session_replication_role') = 'origin' THEN
                 PERFORM set_config('session_replication_role', 'replica', true);
 
+				
                 IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
-                    -- Insertar o actualizar en persons
-                    INSERT INTO beneficiaries.persons (
-                        city_birth_id,
-                        pension_entity_id,
-                        financial_entity_id,
-                        first_name,
-                        second_name,
-                        last_name,
-                        mothers_last_name,
-                        surname_husband,
-                        identity_card,
-                        due_date,
-                        is_duedate_undefined,
-                        gender,
-                        civil_status,
-                        birth_date,
-                        date_death,
-                        death_certificate_number,
-                        reason_death,
-                        phone_number,
-                        cell_phone_number,
-                        nua,
-                        account_number,
-                        sigep_status,
-                        id_person_senasir,
-                        created_at,
-                        updated_at,
-                        deleted_at,
-                        uuid_column
-                    )
-                    VALUES (
-                        NEW.city_birth_id,
-                        NEW.pension_entity_id,
-                        NEW.financial_entity_id,
-                        NEW.first_name,
-                        NEW.second_name,
-                        NEW.last_name,
-                        NEW.mothers_last_name,
-                        NEW.surname_husband,
-                        NEW.identity_card,
-                        NEW.due_date,
-                        NEW.is_duedate_undefined,
-                        NEW.gender,
-                        NEW.civil_status,
-                        NEW.birth_date,
-                        NEW.date_death,
-                        NEW.death_certificate_number,
-                        NEW.reason_death,
-                        NEW.phone_number,
-                        NEW.cell_phone_number,
-                        NEW.nua,
-                        NEW.account_number,
-                        NEW.sigep_status,
-                        NEW.id_person_senasir,
-                        NEW.created_at,
-                        NEW.updated_at,
-                        NEW.deleted_at,
-                        NEW.uuid_reference
-                    )
-                    ON CONFLICT (uuid_column) DO UPDATE
-                    SET city_birth_id          = EXCLUDED.city_birth_id,
-                        pension_entity_id      = EXCLUDED.pension_entity_id,
-                        financial_entity_id    = EXCLUDED.financial_entity_id,
-                        first_name             = EXCLUDED.first_name,
-                        second_name            = EXCLUDED.second_name,
-                        last_name              = EXCLUDED.last_name,
-                        mothers_last_name      = EXCLUDED.mothers_last_name,
-                        surname_husband        = EXCLUDED.surname_husband,
-                        identity_card          = EXCLUDED.identity_card,
-                        due_date               = EXCLUDED.due_date,
-                        is_duedate_undefined   = EXCLUDED.is_duedate_undefined,
-                        gender                 = EXCLUDED.gender,
-                        civil_status           = EXCLUDED.civil_status,
-                        birth_date             = EXCLUDED.birth_date,
-                        date_death             = EXCLUDED.date_death,
-                        death_certificate_number = EXCLUDED.death_certificate_number,
-                        reason_death           = EXCLUDED.reason_death,
-                        phone_number           = EXCLUDED.phone_number,
-                        cell_phone_number      = EXCLUDED.cell_phone_number,
-                        nua                    = EXCLUDED.nua,
-                        account_number         = EXCLUDED.account_number,
-                        sigep_status           = EXCLUDED.sigep_status,
-                        id_person_senasir      = EXCLUDED.id_person_senasir,
-                        updated_at             = EXCLUDED.updated_at,
-                        deleted_at             = EXCLUDED.deleted_at
-                    RETURNING id INTO new_person_id;
+					
+					IF NEW.identity_card IS NOT NULL THEN
+						SELECT uuid_column, id INTO found_person_uuid, new_person_id
+		                FROM beneficiaries.persons
+						WHERE identity_card = NEW.identity_card
+						LIMIT 1;
+					END IF;
 
+					IF found_person_uuid IS NOT NULL THEN
+						UPDATE beneficiaries.persons
+                                SET
+									gender = NEW.gender,
+                                    updated_at = NEW.updated_at,
+									phone_number = NEW.phone_number,
+			                        cell_phone_number = NEW.cell_phone_number,
+			                        nua = NEW.nua,
+			                        account_number = NEW.account_number,
+			                        sigep_status = NEW.sigep_status,
+			                        id_person_senasir = NEW.id_person_senasir
+                                WHERE uuid_column = found_person_uuid;
+
+						UPDATE public.affiliates 
+							SET
+								uuid_reference = found_person_uuid
+							WHERE
+								id = NEW.id;
+
+					ELSE
+	                    -- Insertar o actualizar en persons
+	                    INSERT INTO beneficiaries.persons (
+	                        city_birth_id,
+	                        pension_entity_id,
+	                        financial_entity_id,
+	                        first_name,
+	                        second_name,
+	                        last_name,
+	                        mothers_last_name,
+	                        surname_husband,
+	                        identity_card,
+	                        due_date,
+	                        is_duedate_undefined,
+	                        gender,
+	                        civil_status,
+	                        birth_date,
+	                        date_death,
+	                        death_certificate_number,
+	                        reason_death,
+	                        phone_number,
+	                        cell_phone_number,
+	                        nua,
+	                        account_number,
+	                        sigep_status,
+	                        id_person_senasir,
+	                        created_at,
+	                        updated_at,
+	                        deleted_at,
+	                        uuid_column
+	                    )
+	                    VALUES (
+	                        NEW.city_birth_id,
+	                        NEW.pension_entity_id,
+	                        NEW.financial_entity_id,
+	                        NEW.first_name,
+	                        NEW.second_name,
+	                        NEW.last_name,
+	                        NEW.mothers_last_name,
+	                        NEW.surname_husband,
+	                        NEW.identity_card,
+	                        NEW.due_date,
+	                        NEW.is_duedate_undefined,
+	                        NEW.gender,
+	                        NEW.civil_status,
+	                        NEW.birth_date,
+	                        NEW.date_death,
+	                        NEW.death_certificate_number,
+	                        NEW.reason_death,
+	                        NEW.phone_number,
+	                        NEW.cell_phone_number,
+	                        NEW.nua,
+	                        NEW.account_number,
+	                        NEW.sigep_status,
+	                        NEW.id_person_senasir,
+	                        NEW.created_at,
+	                        NEW.updated_at,
+	                        NEW.deleted_at,
+	                        NEW.uuid_reference
+	                    )
+	                    ON CONFLICT (uuid_column) DO UPDATE
+	                    SET city_birth_id          = EXCLUDED.city_birth_id,
+	                        pension_entity_id      = EXCLUDED.pension_entity_id,
+	                        financial_entity_id    = EXCLUDED.financial_entity_id,
+	                        first_name             = EXCLUDED.first_name,
+	                        second_name            = EXCLUDED.second_name,
+	                        last_name              = EXCLUDED.last_name,
+	                        mothers_last_name      = EXCLUDED.mothers_last_name,
+	                        surname_husband        = EXCLUDED.surname_husband,
+	                        identity_card          = EXCLUDED.identity_card,
+	                        due_date               = EXCLUDED.due_date,
+	                        is_duedate_undefined   = EXCLUDED.is_duedate_undefined,
+	                        gender                 = EXCLUDED.gender,
+	                        civil_status           = EXCLUDED.civil_status,
+	                        birth_date             = EXCLUDED.birth_date,
+	                        date_death             = EXCLUDED.date_death,
+	                        death_certificate_number = EXCLUDED.death_certificate_number,
+	                        reason_death           = EXCLUDED.reason_death,
+	                        phone_number           = EXCLUDED.phone_number,
+	                        cell_phone_number      = EXCLUDED.cell_phone_number,
+	                        nua                    = EXCLUDED.nua,
+	                        account_number         = EXCLUDED.account_number,
+	                        sigep_status           = EXCLUDED.sigep_status,
+	                        id_person_senasir      = EXCLUDED.id_person_senasir,
+	                        updated_at             = EXCLUDED.updated_at,
+	                        deleted_at             = EXCLUDED.deleted_at
+	                    RETURNING id INTO new_person_id;
+					END IF;
                     -- Insertar o actualizar en affiliates
                     INSERT INTO beneficiaries.affiliates (
                         id,
