@@ -65,7 +65,12 @@ export class PersonsController {
     @Payload('isRegisterCellphone') isRegisterCellphone: boolean,
     @Payload('directAccess') directAccess: boolean,
   ) {
-    return this.personsService.validatePersonSms(identityCard, cellphone, isRegisterCellphone, directAccess);
+    return this.personsService.validatePersonSms(
+      identityCard,
+      cellphone,
+      isRegisterCellphone,
+      directAccess,
+    );
   }
 
   @MessagePattern('person.validateWhoIsThePerson')

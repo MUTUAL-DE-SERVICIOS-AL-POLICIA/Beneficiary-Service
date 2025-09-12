@@ -67,7 +67,7 @@ export class PersonsService {
       );
     }
 
-    if(directAccess && registeredNumbers.length > 0) {
+    if (directAccess && registeredNumbers.length > 0) {
       cellphone = registeredNumbers[0];
     }
 
