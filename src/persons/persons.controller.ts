@@ -77,4 +77,9 @@ export class PersonsController {
   async validateWhoIsThePerson(@Payload('personId', ParseIntPipe) personId: number) {
     return this.personsService.validateWhoIsThePerson(personId);
   }
+
+  @MessagePattern('person.getPersonIdByAffiliate')
+  async getPersonIdByAffiliate(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.personsService.getPersonIdByAffiliate(affiliateId);
+  }
 }
