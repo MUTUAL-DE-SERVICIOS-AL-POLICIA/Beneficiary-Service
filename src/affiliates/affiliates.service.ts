@@ -243,7 +243,6 @@ export class AffiliatesService {
     const path = envsFtp.ftpImportDocumentsPvtbe;
     const key = await this.nats.firstValue('auth.login', { username: user, password: pass });
     const pathFtp = envsFtp.ftpDocuments;
-
     if (!key.serviceStatus) {
       throw new RpcException({ message: 'Credenciales incorrectas', code: 401 });
     }
@@ -259,6 +258,7 @@ export class AffiliatesService {
       dataErrorReadFiles: any;
       dataValidRealExist: any;
       dataValidRealNotExist: any;
+      user: any;
     } = {
       totalFolder: 0,
       readFolder: 0,
@@ -270,8 +270,8 @@ export class AffiliatesService {
       dataErrorReadFiles: {},
       dataValidRealExist: [],
       dataValidRealNotExist: {},
+      user: key.user,
     };
-
     const dataRead = {};
     const dataValid = {};
     const dataValidReal = [];
@@ -325,17 +325,14 @@ export class AffiliatesService {
       if (documents.length != 0) {
         dataRead[affiliateId.id] = documentsOriginal;
         initialFolder.filesValidFolder += documents.length;
-
         const validDocuments = await this.dataSource.query(
           `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`,
         );
-
         if (validDocuments.length !== 0) {
           notExistFiles = false;
         }
 
         initialFolder.filesValid += validDocuments.length;
-
         dataValid[affiliateId.id] = {};
         validDocuments.forEach((doc) => {
           const shortened = doc.shortened;
@@ -611,9 +608,12 @@ export class AffiliatesService {
 
     const paths = fileDossiers.map((f) => f.path);
 
-    await this.affiliateFileDossierRepository.delete({ affiliateId, fileDossierId });
+    const [{ name }] = await Promise.all([
+      this.nats.firstValue('fileDossiers.findOne', { id: fileDossierId }),
+      this.affiliateFileDossierRepository.delete({ affiliateId, fileDossierId }),
+    ]);
 
-    return { paths, message: 'Expediente eliminado exitosamente' };
+    return { paths, message: `Expediente ${name} eliminado exitosamente` };
   }
 
   private async findAndVerifyAffiliateWithRelations(

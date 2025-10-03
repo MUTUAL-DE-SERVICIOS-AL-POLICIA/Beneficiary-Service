@@ -37,6 +37,18 @@ export class Affiliate {
   @Column('date', { nullable: true })
   dateDerelict: Date;
 
+  @Column('date', { nullable: true })
+  dateLastContribution: Date;
+
+  @Column('date', { nullable: true })
+  dateEntryReinstatement: Date;
+
+  @Column('date', { nullable: true })
+  dateDerelictReinstatement: Date;
+
+  @Column('date', { nullable: true })
+  dateLastContributionReinstatement: Date;
+
   @Column('text', { nullable: true })
   reasonDerelict: Date;
 
