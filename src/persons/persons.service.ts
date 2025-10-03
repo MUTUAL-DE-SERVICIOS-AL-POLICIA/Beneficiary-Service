@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { format } from 'date-fns';
@@ -447,12 +441,14 @@ export class PersonsService {
       Promise.resolve({ success: [], error: [] }),
     );
     let message = '';
+    const fullName = await this.fullname(person);
+
     if (uploadResults.success.length > 0 && uploadResults.error.length > 0) {
-      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente.`;
+      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente para ${fullName}.`;
     } else if (uploadResults.success.length > 0) {
-      message = `Las huellas se han registrado correctamente.`;
+      message = `Las huellas se han registrado correctamente para ${fullName}.`;
     } else {
-      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente.`;
+      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente para ${fullName}.`;
     }
 
     return {
@@ -494,9 +490,67 @@ export class PersonsService {
     return fingerprints;
   }
 
-  private handleDBException(error: any) {
-    if (error.code === '23505') throw new BadRequestException(error.detail);
-    this.logger.error(error);
-    throw new InternalServerErrorException('Unexecpected Error');
+  async getPersonIdByAffiliate(affiliateId: number): Promise<any> {
+    const { affiliateState, serviceStatus }: any = await this.nats.firstValueInclude(
+      { affiliateId },
+      'affiliate.findOneData',
+      ['id', 'affiliateState'],
+    );
+
+    if (!serviceStatus) {
+      return {
+        message: 'Error en el servicio affiliate.findOneData',
+      };
+    }
+
+    let isThePoliceOne = true;
+    if (affiliateState.id == 4 && affiliateState.name == 'Fallecido') {
+      isThePoliceOne = false;
+    }
+
+    const personAffiliate = await this.personAffiliateRepository.findOne({
+      where: { typeId: affiliateId, type: 'affiliates' },
+      relations: ['person'],
+    });
+    if (!personAffiliate) {
+      throw new NotFoundException(`No se encontró persona para el afiliado con ID: ${affiliateId}`);
+    }
+
+    const { person } = personAffiliate;
+
+    let isThePoliceTwo = true;
+    if (person.dateDeath !== null) {
+      isThePoliceTwo = false;
+    }
+    if (isThePoliceOne && isThePoliceTwo) {
+      return {
+        message: 'El afiliado es policial y la persona se encuentra con vida',
+        personId: person.id,
+        fullname: await this.fullname(person),
+      };
+    }
+
+    const personReal = await this.personAffiliateRepository.findOne({
+      where: { typeId: person.id, type: 'persons', state: true },
+      relations: ['person'],
+    });
+
+    if (!personReal) {
+      return {
+        message: 'No se encontró persona real para la persona con ID: ' + person.id,
+      };
+    }
+    const { person: personRealData } = personReal;
+
+    return {
+      personId: personRealData.id,
+      fullname: await this.fullname(personRealData),
+    };
+  }
+
+  private async fullname(person: Person): Promise<string> {
+    return [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+      .filter(Boolean)
+      .join(' ');
   }
 }
