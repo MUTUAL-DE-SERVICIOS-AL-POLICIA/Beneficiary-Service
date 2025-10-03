@@ -379,7 +379,6 @@ export class PersonsService {
   }
   async createPersonFingerPrint(personId: number, personFingerprints: any[]): Promise<any> {
     const person = await this.findOnePerson(`${personId}`, 'id');
-    console.log(person);
     const uploadFiles: any[] = [];
     const removeFiles: string[] = [];
 
