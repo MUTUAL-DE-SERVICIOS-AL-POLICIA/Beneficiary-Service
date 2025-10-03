@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { format } from 'date-fns';
@@ -12,7 +6,7 @@ import { es } from 'date-fns/locale';
 import { NatsService } from 'src/common';
 import { envsFtp } from 'src/config/envs';
 import { Repository } from 'typeorm';
-import { CreatePersonDto, UpdatePersonDto } from './dto';
+import { UpdatePersonDto } from './dto';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 
@@ -31,15 +25,153 @@ export class PersonsService {
     private readonly personAffiliateRepository: Repository<PersonAffiliate>,
     private readonly nats: NatsService,
   ) {}
-  async create(createPersonDto: CreatePersonDto) {
-    try {
-      const person = this.personRepository.create(createPersonDto);
-      await this.personRepository.save(person);
-      return person;
-    } catch (error) {
-      this.handleDBException(error);
+
+  async validatePersonSms(
+    identityCard: string,
+    cellphone: string,
+    isRegisterCellphone: boolean,
+    directAccess: boolean,
+  ): Promise<any> {
+    const messageCellphone = 'Número de teléfono no registrado para esta persona.';
+    const person = await this.personRepository.findOne({
+      where: { identityCard },
+    });
+    if (!person) {
+      return {
+        validateStatus: false,
+        message: 'Persona no encontrada',
+      };
     }
+
+    if (person.dateDeath !== null) {
+      return {
+        validateStatus: false,
+        message: 'La persona se encuentra fallecida',
+      };
+    }
+
+    let registeredNumbers: string[] = [];
+
+    if (person.cellPhoneNumber != null) {
+      registeredNumbers = person.cellPhoneNumber.split(',').map((num) =>
+        num
+          .replace(/[()\s-]/g, '')
+          .replace(/^591/, '')
+          .trim(),
+      );
+    }
+
+    if (directAccess && registeredNumbers.length > 0) {
+      cellphone = registeredNumbers[0];
+    }
+
+    const normalizedInput = cellphone.replace(/[()\s-]/g, '').replace(/^591/, '');
+    const exists = registeredNumbers.some((num) => num === normalizedInput);
+
+    if (isRegisterCellphone && !exists) {
+      const formattedNumber = `(${normalizedInput.slice(0, 3)})-${normalizedInput.slice(3)}`;
+
+      const currentNumbers = person.cellPhoneNumber
+        ? person.cellPhoneNumber.split(',').filter((n) => n.trim() !== '')
+        : [];
+
+      person.cellPhoneNumber = [formattedNumber, ...currentNumbers].join(',');
+      await this.personRepository.save(person);
+    }
+
+    if (!isRegisterCellphone && !exists) {
+      return {
+        validateStatus: false,
+        message: messageCellphone,
+      };
+    }
+
+    if (exists) {
+      const formattedInput = `(${normalizedInput.slice(0, 3)})-${normalizedInput.slice(3)}`;
+
+      const currentNumbers = person.cellPhoneNumber
+        ? person.cellPhoneNumber.split(',').map((n) => n.trim())
+        : [];
+
+      const reordered = [formattedInput, ...currentNumbers.filter((n) => n !== formattedInput)];
+      person.cellPhoneNumber = reordered.join(',');
+      await this.personRepository.save(person);
+    }
+
+    return {
+      validateStatus: true,
+      message: 'Persona encontrada con numero de teléfono registrado y verificado',
+      person,
+    };
   }
+
+  async validateWhoIsThePerson(personId: number): Promise<any> {
+    const affiliate = await this.personAffiliateRepository.find({
+      where: { personId: personId, type: 'affiliates' },
+    });
+
+    if (affiliate.length > 0) {
+      return {
+        affiliateId: affiliate[0].typeId,
+        isPolice: true,
+        validateStatus: true,
+        message: 'Persona verificada, afiliado policial',
+        kinshipId: affiliate[0].kinshipType,
+      };
+    }
+
+    const affiliateReference = await this.personAffiliateRepository.find({
+      where: { personId: personId, type: 'persons', state: true },
+    });
+
+    if (affiliateReference.length > 1) {
+      return {
+        affiliateId: null,
+        isPolice: false,
+        validateStatus: false,
+        message: 'Persona afiliada con mas de un afiliado policial',
+      };
+    }
+
+    if (affiliateReference.length === 1) {
+      const person = await this.personRepository.findOne({
+        where: { id: affiliateReference[0].typeId },
+      });
+
+      if (person.dateDeath !== null) {
+        const affiliate = await this.personAffiliateRepository.find({
+          where: { personId: person.id, type: 'affiliates' },
+        });
+
+        if (affiliate.length > 0) {
+          return {
+            affiliateId: affiliate[0].typeId,
+            isPolice: false,
+            validateStatus: true,
+            message: 'afiliado de la persona verificada',
+            kinshipId: affiliateReference[0].kinshipType,
+            pensionEntityId: person.pensionEntityId,
+          };
+        }
+      } else {
+        return {
+          affiliateId: null,
+          isPolice: false,
+          validateStatus: false,
+          message:
+            'La persona titular no se encuentra fallecida, pasar por oficinas de la MUSERPOL',
+        };
+      }
+    }
+
+    return {
+      affiliateId: null,
+      isPolice: false,
+      validateStatus: false,
+      message: 'Persona sin registros activos de afiliación',
+    };
+  }
+
   async showListFingerprint(): Promise<any> {
     const listFingerprint = await this.fingerprintTypeRepository.find();
     return listFingerprint.map(({ id, name }) => ({ id, name }));
@@ -120,20 +252,14 @@ export class PersonsService {
     return person;
   }
 
-  async update(id: number, updatePersonDto: UpdatePersonDto) {
-    const person = await this.personRepository.preload({
-      id: id,
-      ...updatePersonDto,
-    });
+  async update(id: number, person: UpdatePersonDto) {
+    const result = await this.personRepository.update(id, person);
 
-    if (!person) throw new NotFoundException(`Person with: ${id} not found`);
-
-    try {
-      await this.personRepository.save(person);
-      return person;
-    } catch (error) {
-      this.handleDBException(error);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Person with id: ${id} not found`);
     }
+
+    return { message: 'Person updated successfully' };
   }
 
   async remove(id: number) {
@@ -181,7 +307,7 @@ export class PersonsService {
         'id',
         'name',
       ]),
-      this.nats.firstValueInclude({ id: pensionEntityId }, 'financialEntities.findOne', [
+      this.nats.firstValueInclude({ id: financialEntityId }, 'financialEntities.findOne', [
         'id',
         'name',
       ]),
@@ -315,12 +441,14 @@ export class PersonsService {
       Promise.resolve({ success: [], error: [] }),
     );
     let message = '';
+    const fullName = await this.fullname(person);
+
     if (uploadResults.success.length > 0 && uploadResults.error.length > 0) {
-      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente.`;
+      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente para ${fullName}.`;
     } else if (uploadResults.success.length > 0) {
-      message = `Las huellas se han registrado correctamente.`;
+      message = `Las huellas se han registrado correctamente para ${fullName}.`;
     } else {
-      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente.`;
+      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente para ${fullName}.`;
     }
 
     return {
@@ -362,9 +490,67 @@ export class PersonsService {
     return fingerprints;
   }
 
-  private handleDBException(error: any) {
-    if (error.code === '23505') throw new BadRequestException(error.detail);
-    this.logger.error(error);
-    throw new InternalServerErrorException('Unexecpected Error');
+  async getPersonIdByAffiliate(affiliateId: number): Promise<any> {
+    const { affiliateState, serviceStatus }: any = await this.nats.firstValueInclude(
+      { affiliateId },
+      'affiliate.findOneData',
+      ['id', 'affiliateState'],
+    );
+
+    if (!serviceStatus) {
+      return {
+        message: 'Error en el servicio affiliate.findOneData',
+      };
+    }
+
+    let isThePoliceOne = true;
+    if (affiliateState.id == 4 && affiliateState.name == 'Fallecido') {
+      isThePoliceOne = false;
+    }
+
+    const personAffiliate = await this.personAffiliateRepository.findOne({
+      where: { typeId: affiliateId, type: 'affiliates' },
+      relations: ['person'],
+    });
+    if (!personAffiliate) {
+      throw new NotFoundException(`No se encontró persona para el afiliado con ID: ${affiliateId}`);
+    }
+
+    const { person } = personAffiliate;
+
+    let isThePoliceTwo = true;
+    if (person.dateDeath !== null) {
+      isThePoliceTwo = false;
+    }
+    if (isThePoliceOne && isThePoliceTwo) {
+      return {
+        message: 'El afiliado es policial y la persona se encuentra con vida',
+        personId: person.id,
+        fullname: await this.fullname(person),
+      };
+    }
+
+    const personReal = await this.personAffiliateRepository.findOne({
+      where: { typeId: person.id, type: 'persons', state: true },
+      relations: ['person'],
+    });
+
+    if (!personReal) {
+      return {
+        message: 'No se encontró persona real para la persona con ID: ' + person.id,
+      };
+    }
+    const { person: personRealData } = personReal;
+
+    return {
+      personId: personRealData.id,
+      fullname: await this.fullname(personRealData),
+    };
+  }
+
+  private async fullname(person: Person): Promise<string> {
+    return [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+      .filter(Boolean)
+      .join(' ');
   }
 }

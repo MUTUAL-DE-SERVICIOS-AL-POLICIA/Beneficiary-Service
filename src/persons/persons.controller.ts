@@ -1,6 +1,5 @@
 import { Controller, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
 import { PersonsService } from './persons.service';
-import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
@@ -8,11 +7,6 @@ import { FilteredPaginationDto } from './dto/filter-person.dto';
 @Controller('persons')
 export class PersonsController {
   constructor(private readonly personsService: PersonsService) {}
-
-  @MessagePattern('person.create')
-  create(@Payload() createPersonDto: CreatePersonDto) {
-    return this.personsService.create(createPersonDto);
-  }
 
   @MessagePattern('person.findAll')
   findAll(@Payload() filteredPaginationDto: FilteredPaginationDto) {
@@ -25,13 +19,8 @@ export class PersonsController {
   }
 
   @MessagePattern('person.update')
-  update(@Payload() updatePersonDto: UpdatePersonDto) {
-    return this.personsService.update(updatePersonDto.id, updatePersonDto);
-  }
-
-  @MessagePattern('person.delete')
-  remove(@Payload('id', ParseIntPipe) id: number) {
-    return this.personsService.remove(id);
+  update(@Payload() person: UpdatePersonDto) {
+    return this.personsService.update(person.id, person);
   }
 
   @MessagePattern('person.findOneWithFeatures')
@@ -40,7 +29,7 @@ export class PersonsController {
   }
 
   @MessagePattern('person.findAffiliates')
-  async findAffilites(@Payload('id', ParseIntPipe) id: number) {
+  async findAffiliates(@Payload('id', ParseIntPipe) id: number) {
     return this.personsService.findAffiliates(id);
   }
 
@@ -67,5 +56,30 @@ export class PersonsController {
   @MessagePattern('person.getFingerprints')
   async getFingerprints(data: { id: number; columns?: string[] }) {
     return this.personsService.getFingerprints(data.id, data.columns);
+  }
+
+  @MessagePattern('person.validatePersonSms')
+  async validatePersonSms(
+    @Payload('identityCard') identityCard: string,
+    @Payload('cellphone') cellphone: string,
+    @Payload('isRegisterCellphone') isRegisterCellphone: boolean,
+    @Payload('directAccess') directAccess: boolean,
+  ) {
+    return this.personsService.validatePersonSms(
+      identityCard,
+      cellphone,
+      isRegisterCellphone,
+      directAccess,
+    );
+  }
+
+  @MessagePattern('person.validateWhoIsThePerson')
+  async validateWhoIsThePerson(@Payload('personId', ParseIntPipe) personId: number) {
+    return this.personsService.validateWhoIsThePerson(personId);
+  }
+
+  @MessagePattern('person.getPersonIdByAffiliate')
+  async getPersonIdByAffiliate(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.personsService.getPersonIdByAffiliate(affiliateId);
   }
 }
