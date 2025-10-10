@@ -8,7 +8,6 @@ export class AffiliatesController {
 
   @Get()
   findAll(@Query() paginationDto: PaginationDto) {
-    console.log(paginationDto);
     return this.affiliatesService.findAll(paginationDto);
   }
   @MessagePattern('affiliate.findOne')
