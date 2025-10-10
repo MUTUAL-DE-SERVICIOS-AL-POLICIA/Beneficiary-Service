@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class MigrateOrphan1738490554528 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    console.log('Ejecutando BeneficiaryMigrateOrphan');
     await queryRunner.query(`
       with only_orphans as (
         select a.identity_card affiliate_ci, s.identity_card spouse_ci, eca.* 
