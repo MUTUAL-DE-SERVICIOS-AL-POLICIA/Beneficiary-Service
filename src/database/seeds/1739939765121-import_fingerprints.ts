@@ -1,11 +1,13 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
 import { ClientProxyFactory, Transport, ClientProxy } from '@nestjs/microservices';
+import { Logger } from '@nestjs/common';
 import { NatsService } from 'src/common';
 import { NastEnvs } from 'src/config';
 
 export class BeneficiaryImportFingerprints implements Seeder {
   track = true;
+  private readonly logger = new Logger('BeneficiaryImportFingerprints');
 
   private separarNombreYNumero(filename: string): { name: string; quality: number | null } {
     const match = filename.match(/^(.*)_(\d+)\.wsq$/);
@@ -34,7 +36,6 @@ export class BeneficiaryImportFingerprints implements Seeder {
   }
 
   public async run(dataSource: DataSource): Promise<any> {
-    console.log('Ejecutando BeneficiaryImportFingerprints');
     const path = 'Person/Fingerprints';
 
     const client: ClientProxy = ClientProxyFactory.create({
@@ -87,7 +88,7 @@ export class BeneficiaryImportFingerprints implements Seeder {
       await transactionalEntityManager.query(
         `INSERT INTO beneficiaries.person_fingerprints (quality, path, person_id, fingerprint_type_id) VALUES ${inserts.join(',')}`,
       );
-      console.log(cont + ' huellas registradas en base de datos');
+      this.logger.log(cont + ' huellas registradas en base de datos');
     });
     await nats.firstValue('ftp.connectSwitch', { value: 'false' });
   }

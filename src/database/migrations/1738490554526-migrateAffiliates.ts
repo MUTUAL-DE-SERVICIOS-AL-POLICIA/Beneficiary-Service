@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class MigrateAffiliates1738490554526 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    console.log('Ejecutando BeneficiaryMigrateAffiliates');
     await queryRunner.query(`INSERT INTO beneficiaries.persons (
       city_birth_id,
       pension_entity_id, financial_entity_id,
