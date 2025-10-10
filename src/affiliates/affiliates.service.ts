@@ -258,6 +258,7 @@ export class AffiliatesService {
       dataErrorReadFiles: any;
       dataValidRealExist: any;
       dataValidRealNotExist: any;
+      duplicateData: any;
       user: any;
     } = {
       totalFolder: 0,
@@ -270,6 +271,7 @@ export class AffiliatesService {
       dataErrorReadFiles: {},
       dataValidRealExist: [],
       dataValidRealNotExist: {},
+      duplicateData: {},
       user: key.user,
     };
     const dataRead = {};
@@ -346,6 +348,7 @@ export class AffiliatesService {
     }
     await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
     let totalThumbs: number = 0;
+    const shortenedMap: Record<string, boolean> = {};
 
     for (const affiliateId in dataRead) {
       const validDocsMap = dataValid[affiliateId];
@@ -355,13 +358,23 @@ export class AffiliatesService {
 
         if (validDoc) {
           const short = `${doc.replace(/^'|'$/g, '')}`;
-          dataValidReal.push({
-            affiliate_id: affiliateId,
-            procedure_document_id: validDoc.id,
-            shortened: short,
-            oldPath: `${path}/${affiliateId}/${short}`,
-            newPath: `${pathFtp}/${affiliateId}/${short}`,
-          });
+          const key = `${affiliateId}_${validDoc.id}`;
+
+          if (shortenedMap[key]) {
+            if (!initialFolder.duplicateData[affiliateId]) {
+              initialFolder.duplicateData[affiliateId] = [];
+            }
+            initialFolder.duplicateData[affiliateId].push(short);
+          } else {
+            shortenedMap[key] = true;
+            dataValidReal.push({
+              affiliate_id: affiliateId,
+              procedure_document_id: validDoc.id,
+              shortened: short,
+              oldPath: `${path}/${affiliateId}/${short}`,
+              newPath: `${pathFtp}/${affiliateId}/${short}`,
+            });
+          }
         } else {
           if (
             doc.replace(/^'|'$/g, '') !== 'Thumbs.db' &&
