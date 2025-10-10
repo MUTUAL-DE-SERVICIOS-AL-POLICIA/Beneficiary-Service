@@ -1,12 +1,14 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
 import { NatsService } from 'src/common';
+import { Logger } from '@nestjs/common';
 import * as readline from 'readline';
 import { envsFtp } from 'src/config/envs';
 import { ClientProxyFactory, Transport, ClientProxy } from '@nestjs/microservices';
 import { NastEnvs } from 'src/config';
 
 export class BeneficiaryImportRequirements implements Seeder {
+  private readonly logger = new Logger('BeneficiaryImportRequirements');
   //track = true;
   async promptUser(question: string): Promise<string> {
     const rl = readline.createInterface({
@@ -23,7 +25,7 @@ export class BeneficiaryImportRequirements implements Seeder {
   }
 
   public async run(dataSource: DataSource): Promise<any> {
-    console.log('Ejecutando BeneficiaryImportRequirements');
+    this.logger.log('Ejecutando BeneficiaryImportRequirements');
     const client: ClientProxy = ClientProxyFactory.create({
       transport: Transport.NATS,
       options: {
@@ -145,20 +147,20 @@ export class BeneficiaryImportRequirements implements Seeder {
 
     initialFolder.filesValidFolder -= totalThumbs;
     await nats.firstValue('ftp.connectSwitch', { value: 'false' });
-    console.log('Lectura de carpetas:');
-    console.log('Total Carpetas: ', initialFolder.totalFolder);
-    console.log('Carpetas leídas:', initialFolder.readFolder);
-    console.log('Carpetas validas:', initialFolder.validFolder);
-    console.log('Carpetas con errores:', initialFolder.dataErrorReadFolder);
-    console.log('Archivos total de las carpetas validas', initialFolder.filesValidFolder);
-    console.log('Archivos validos para subir', initialFolder.filesValid);
-    //console.log('Archivos validos:', dataValidReal);
-    console.log('Numero de Archivos con errores:', totalErrors);
-    console.log('Archivos con errores:', initialFolder.dataErrorReadFiles);
+    this.logger.log('Lectura de carpetas:');
+    this.logger.log('Total Carpetas: ', initialFolder.totalFolder);
+    this.logger.log('Carpetas leídas:', initialFolder.readFolder);
+    this.logger.log('Carpetas validas:', initialFolder.validFolder);
+    this.logger.log('Carpetas con errores:', initialFolder.dataErrorReadFolder);
+    this.logger.log('Archivos total de las carpetas validas', initialFolder.filesValidFolder);
+    this.logger.log('Archivos validos para subir', initialFolder.filesValid);
+    //this.logger.log('Archivos validos:', dataValidReal);
+    this.logger.log('Numero de Archivos con errores:', totalErrors);
+    this.logger.log('Archivos con errores:', initialFolder.dataErrorReadFiles);
     const answer = await this.promptUser('¿Deseas continuar? (y/n): ');
 
     if (answer.toLowerCase() !== 'y') {
-      console.log('Abortando ejecución del seeder.');
+      this.logger.log('Abortando ejecución del seeder.');
       return;
     }
     let cont: number = 0;
@@ -178,7 +180,9 @@ export class BeneficiaryImportRequirements implements Seeder {
           `INSERT INTO beneficiaries.affiliate_documents (affiliate_id, procedure_document_id, path) VALUES ${inserts.join(',')}`,
         );
       }
-      console.log(`Todas las inserciones,${cont} se completaron exitosamente en una transacción.`);
+      this.logger.log(
+        `Todas las inserciones,${cont} se completaron exitosamente en una transacción.`,
+      );
     });
   }
 }

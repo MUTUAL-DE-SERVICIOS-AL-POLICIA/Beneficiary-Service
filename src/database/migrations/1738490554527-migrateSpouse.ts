@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class MigrateSpouse1738490554527 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    console.log('Ejecutando BeneficiaryMigrateSpouse');
     await queryRunner.query(`CREATE OR REPLACE PROCEDURE migrate_spouse()
     LANGUAGE plpgsql
     AS $procedure$
