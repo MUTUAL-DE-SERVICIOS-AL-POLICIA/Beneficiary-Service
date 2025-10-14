@@ -7,10 +7,12 @@ import {
   ManyToOne,
   Column,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { Affiliate } from './';
 
 @Entity({ schema: 'beneficiaries', name: 'affiliate_documents' })
+@Unique(['affiliateId', 'procedureDocumentId'])
 export class AffiliateDocument {
   @PrimaryGeneratedColumn()
   id: number;
