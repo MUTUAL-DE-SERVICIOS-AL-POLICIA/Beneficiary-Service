@@ -98,4 +98,9 @@ export class AffiliatesController {
   ) {
     return this.affiliatesService.deleteFileDossier(affiliateId, fileDossierId);
   }
+
+  @MessagePattern('affiliate.affiliateIdForPersonId')
+  affiliateIdForPersonId(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.affiliateIdForPersonId(affiliateId);
+  }
 }
