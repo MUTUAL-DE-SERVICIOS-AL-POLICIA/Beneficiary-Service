@@ -93,11 +93,11 @@ export class AffiliatesService {
       affiliateDocument = new AffiliateDocument();
       affiliateDocument.affiliate = affiliate;
       affiliateDocument.procedureDocumentId = procedureDocumentId;
-      response = 'Creado';
+      response = 'creado';
     } else {
       affiliateDocument = affiliate.affiliateDocuments[0];
       affiliateDocument.updatedAt = new Date();
-      response = 'Actualizado';
+      response = 'actualizado';
     }
 
     affiliateDocument.path = `${initialPath}${document.shortened ?? document.name}.pdf`;
@@ -115,7 +115,7 @@ export class AffiliatesService {
 
     return {
       serviceStatus: document.serviceStatus,
-      message: `${document.name} ${response} exitosamente`,
+      message: `${document.shortened} ${response} exitosamente`,
       affiliateDocuments,
     };
   }
@@ -300,7 +300,6 @@ export class AffiliatesService {
     const validAffiliates = await this.dataSource.query(`
       SELECT id FROM beneficiaries.affiliates WHERE id IN (${affiliateIds.join(',')})
     `);
-
     if (validAffiliates.length === 0) {
       throw new RpcException({ message: 'Ninguna Carpeta es Válida', code: 404 });
     }
@@ -327,9 +326,13 @@ export class AffiliatesService {
       if (documents.length != 0) {
         dataRead[affiliateId.id] = documentsOriginal;
         initialFolder.filesValidFolder += documents.length;
-        const validDocuments = await this.dataSource.query(
-          `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`,
-        );
+        const [validDocuments, dataPerson] = await Promise.all([
+          this.dataSource.query(
+            `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`
+          ),
+          this.affiliateIdForPersonId(affiliateId.id),
+        ]);
+
         if (validDocuments.length !== 0) {
           notExistFiles = false;
         }
@@ -338,6 +341,7 @@ export class AffiliatesService {
         dataValid[affiliateId.id] = {};
         validDocuments.forEach((doc) => {
           const shortened = doc.shortened;
+          doc.personId = dataPerson.personId;
           dataValid[affiliateId.id][shortened] = doc;
         });
       }
@@ -355,10 +359,10 @@ export class AffiliatesService {
       dataRead[affiliateId].forEach((doc) => {
         const cleanedDoc = doc.replace(/^'|'$/g, '').replace(/\.[^.]+$/, '');
         const validDoc = validDocsMap[cleanedDoc];
-
         if (validDoc) {
           const short = `${doc.replace(/^'|'$/g, '')}`;
           const key = `${affiliateId}_${validDoc.id}`;
+          const personId = validDoc.personId;
 
           if (shortenedMap[key]) {
             if (!initialFolder.duplicateData[affiliateId]) {
@@ -373,6 +377,7 @@ export class AffiliatesService {
               shortened: short,
               oldPath: `${path}/${affiliateId}/${short}`,
               newPath: `${pathFtp}/${affiliateId}/${short}`,
+              personId: personId,
             });
           }
         } else {
@@ -432,12 +437,12 @@ export class AffiliatesService {
     await this.nats.firstValue('ftp.connectSwitch', { value: 'true' });
     const Archivos_validos_reales_Existentes = data.dataValidRealExist;
     const Archivos_validos_reales_No_Existentes = data.dataValidRealNotExist;
-
     let contNewFiles = 0;
     let contExistFiles = 0;
 
     await this.dataSource.transaction(async (transactionalEntityManager) => {
       const insertsNew: string[] = [];
+      const insertsRecords: string[] = [];
       try {
         for (const file of Archivos_validos_reales_No_Existentes) {
           await this.nats.firstValue('ftp.renameFile', {
@@ -446,6 +451,9 @@ export class AffiliatesService {
           });
           insertsNew.push(
             `(${file.affiliate_id}, ${file.procedure_document_id}, '${file.newPath}')`,
+          );
+          insertsRecords.push(
+            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','${data.user.name} creó el documento ${file.shortened} al beneficiario con NUP ${file.affiliate_id} por importación','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se creó el documento ${file.shortened} exitosamente."}',${file.personId})`,
           );
           contNewFiles++;
         }
@@ -463,6 +471,9 @@ export class AffiliatesService {
             newPath: file.newPath,
           });
 
+          insertsRecords.push(
+            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','${data.user.name} actualizó el documento ${file.shortened} al beneficiario con NUP ${file.affiliate_id} por importación','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se actualizó el documento ${file.shortened} exitosamente."}',${file.personId})`,
+          );
           const queryExist = `
             UPDATE beneficiaries.affiliate_documents
             SET updated_at = NOW(), path = '${file.newPath}'
@@ -471,10 +482,16 @@ export class AffiliatesService {
 
           contExistFiles++;
         }
+
+        if (insertsRecords.length > 0) {
+          const queryRecords = `
+            INSERT INTO records.records_beneficiaries ("user", action, description, input, output, person_id)
+            VALUES ${insertsRecords.join(',')}`;
+          await transactionalEntityManager.query(queryRecords);
+        }
       } catch (error) {
         throw new RpcException({ message: 'Ya se realizo la importación', code: 404 });
       }
-
       this.logger.log(`Archivos nuevos procesados: ${contNewFiles}`);
       this.logger.log(`Archivos existentes actualizados: ${contExistFiles}`);
     });
@@ -486,6 +503,7 @@ export class AffiliatesService {
       newFiles: contNewFiles,
       updateFIles: contExistFiles,
       totalFiles: contNewFiles + contExistFiles,
+      message: `${contNewFiles} nuevos archivos, ${contExistFiles} archivos actualizados.`,
     };
   }
 
@@ -627,6 +645,20 @@ export class AffiliatesService {
     ]);
 
     return { paths, message: `Expediente ${name} eliminado exitosamente` };
+  }
+
+  public async affiliateIdForPersonId(affiliateId: number): Promise<{ personId: number }> {
+    const result = await this.dataSource.query(
+      `
+      SELECT person_id
+      FROM beneficiaries.person_affiliates
+      WHERE type = 'affiliates' AND type_id = $1
+      LIMIT 1
+      `,
+      [affiliateId],
+    );
+
+    return { personId: result[0].person_id };
   }
 
   private async findAndVerifyAffiliateWithRelations(
