@@ -34,30 +34,36 @@ export class Person {
   })
   financialEntityId: number;
 
-  @Column('text')
+  @Column('varchar',{
+    length: 255,
+  })
   firstName: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   secondName: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   lastName: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   mothersLastName: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   surnameHusband: string;
 
-  @Column('text', { unique: true })
+  @Column('varchar', { length: 255, unique: true })
   identityCard: string;
 
   @Column('date', {
@@ -84,37 +90,42 @@ export class Person {
   })
   dateDeath: Date;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   deathCertificateNumber: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   reasonDeath: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   phoneNumber: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   cellPhoneNumber: string;
 
-  @Column('int', {
+  @Column('bigint', {
     nullable: true,
   })
-  nua: number;
+  nua: string;
 
-  @Column('text', {
+  @Column('bigint', {
     nullable: true,
   })
   accountNumber: string;
 
-  @Column('text', {
+  @Column('varchar', {
+    length: 255,
     nullable: true,
   })
   sigepStatus: string;

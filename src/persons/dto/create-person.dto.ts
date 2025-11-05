@@ -61,9 +61,9 @@ export class CreatePersonDto {
   @IsString()
   phone_number: string;
 
-  @IsNumber()
+  @IsString()
   @IsOptional()
-  nua?: number;
+  nua?: string;
 
   @IsString()
   @IsOptional()
