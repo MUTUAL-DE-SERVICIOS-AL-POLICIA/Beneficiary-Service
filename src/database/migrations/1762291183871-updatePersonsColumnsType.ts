@@ -3,6 +3,16 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class UpdatePersonsColumnsType1762291183871 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
+            ALTER TABLE beneficiaries.affiliate_documents DROP CONSTRAINT "FK_affiliate_documents_affiliates";
+            ALTER TABLE beneficiaries.affiliate_documents ADD CONSTRAINT "FK_affiliate_documents_affiliates" FOREIGN KEY (affiliate_id) REFERENCES beneficiaries.affiliates(id) ON DELETE CASCADE;
+
+            ALTER TABLE beneficiaries.affiliate_file_dossiers DROP CONSTRAINT "FK_affiliate_file_dossiers_affiliates";
+            ALTER TABLE beneficiaries.affiliate_file_dossiers ADD CONSTRAINT "FK_affiliate_file_dossiers_affiliates" FOREIGN KEY (affiliate_id) REFERENCES beneficiaries.affiliates(id) ON DELETE CASCADE;
+
+            ALTER TABLE beneficiaries.person_fingerprints DROP CONSTRAINT "FK_fingerprint_person";
+            ALTER TABLE beneficiaries.person_fingerprints ADD CONSTRAINT "FK_fingerprint_person" FOREIGN KEY (person_id) REFERENCES beneficiaries.persons(id) ON DELETE CASCADE;
+         `);
+    await queryRunner.query(`
             ALTER TABLE beneficiaries.persons
                 ALTER COLUMN account_number TYPE BIGINT USING account_number::BIGINT,
                 ALTER COLUMN cell_phone_number TYPE VARCHAR(255) USING cell_phone_number::VARCHAR(255),
@@ -21,5 +31,16 @@ export class UpdatePersonsColumnsType1762291183871 implements MigrationInterface
             `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {}
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+            ALTER TABLE beneficiaries.affiliate_documents DROP CONSTRAINT "FK_affiliate_documents_affiliates";
+            ALTER TABLE beneficiaries.affiliate_documents ADD CONSTRAINT "FK_affiliate_documents_affiliates" FOREIGN KEY (affiliate_id) REFERENCES beneficiaries.affiliates(id) ON DELETE RESTRICT;
+
+            ALTER TABLE beneficiaries.affiliate_file_dossiers DROP CONSTRAINT "FK_affiliate_file_dossiers_affiliates";
+            ALTER TABLE beneficiaries.affiliate_file_dossiers ADD CONSTRAINT "FK_affiliate_file_dossiers_affiliates" FOREIGN KEY (affiliate_id) REFERENCES beneficiaries.affiliates(id) ON DELETE RESTRICT;
+
+            ALTER TABLE beneficiaries.person_fingerprints DROP CONSTRAINT "FK_fingerprint_person";
+            ALTER TABLE beneficiaries.person_fingerprints ADD CONSTRAINT "FK_fingerprint_person" FOREIGN KEY (person_id) REFERENCES beneficiaries.persons(id) ON DELETE RESTRICT;
+         `);
+  }
 }
