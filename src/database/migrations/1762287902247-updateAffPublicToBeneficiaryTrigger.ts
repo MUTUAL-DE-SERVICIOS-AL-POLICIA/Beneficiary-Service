@@ -8,12 +8,12 @@ export class UpdateAffPublicToBeneficiaryTrigger1762287902247 implements Migrati
         DECLARE
             new_person_id BIGINT;
 			found_person_uuid UUID;
+			count_related INT;
+			count_kinship INT;
         BEGIN
             -- Evitar bucles de replicación
-            IF current_setting('session_replication_role') = 'origin' THEN
-                PERFORM set_config('session_replication_role', 'replica', true);
+            SET LOCAL session_replication_role = 'replica';
 
-				
                 IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
 					
 					found_person_uuid := NULL;
@@ -206,13 +206,43 @@ export class UpdateAffPublicToBeneficiaryTrigger1762287902247 implements Migrati
                     );
 
                 ELSIF TG_OP = 'DELETE' THEN
-                    DELETE FROM beneficiaries.persons
-                    WHERE uuid_column = OLD.uuid_reference;
-                END IF;
+					-- Se vuelve a activar el role origin para que los delete cascade funcionen
+					SET LOCAL session_replication_role = 'origin';
+					SELECT id INTO new_person_id FROM beneficiaries.persons WHERE uuid_column = OLD.uuid_reference;
+					-- Si no hay person, no hacemos nada
+					IF new_person_id IS NULL THEN
+						RETURN OLD;
+					END IF;
+					-- Verificar si el afiliado tiene derechohabientes
+			        SELECT COUNT(*)
+			        INTO count_kinship
+			        FROM beneficiaries.person_affiliates
+			        WHERE type_id = new_person_id
+			        	AND type = 'persons';
 
-                -- Restaurar rol
-                PERFORM set_config('session_replication_role', 'origin', true);
-            END IF;
+					IF count_kinship > 0 THEN
+			        	RAISE EXCEPTION 'No se puede eliminar el afiliado % porque tiene derechohabientes asociados.', OLD.id;
+			        END IF;
+					-- Se elimina el afiliado
+					DELETE FROM beneficiaries.affiliates where id = OLD.id;
+					-- Eliminar la relación de tipo 'affiliates'
+			        DELETE FROM beneficiaries.person_affiliates
+			        WHERE type = 'affiliates'
+			        	AND type_id = OLD.id;
+					
+					-- Verificar si el afiliado es derechohabiente
+			        SELECT COUNT(*)
+			        INTO count_related
+			        FROM beneficiaries.person_affiliates
+			        WHERE person_id = new_person_id
+			        	AND type = 'persons';
+					
+					-- Si no tiene otras relaciones, eliminar persona
+			        IF count_related = 0 THEN
+			        	DELETE FROM beneficiaries.persons
+			        	WHERE id = new_person_id;
+			        END IF;
+                END IF;
 
             RETURN NEW;
 
