@@ -20,12 +20,20 @@ export class AffiliatesController {
     return this.affiliatesService.findOneData(affiliateId);
   }
 
-  @MessagePattern('affiliate.createOrUpdateDocument')
-  async createOrUpdateDocument(
+  @MessagePattern('affiliate.createAffiliateDocument')
+  async createAffiliateDocument(
     @Payload() payload: { affiliateId: string; procedureDocumentId: string },
   ) {
     const { affiliateId, procedureDocumentId } = payload;
-    return this.affiliatesService.createOrUpdateDocument(+affiliateId, +procedureDocumentId);
+    return this.affiliatesService.createAffiliateDocument(+affiliateId, +procedureDocumentId);
+  }
+
+  @MessagePattern('affiliate.updateAffiliateDocument')
+  async updateAffiliateDocument(
+    @Payload() payload: { affiliateId: string; procedureDocumentId: string },
+  ) {
+    const { affiliateId, procedureDocumentId } = payload;
+    return this.affiliatesService.updateAffiliateDocument(+affiliateId, +procedureDocumentId);
   }
 
   @MessagePattern('affiliate.showDocuments')
@@ -60,14 +68,22 @@ export class AffiliatesController {
     return this.affiliatesService.documentsImports(payload);
   }
 
-  @MessagePattern('affiliate.findAllFileDossiers')
-  findAllFileDossiers() {
-    return this.affiliatesService.findAllFileDossiers();
+  @MessagePattern('affiliate.createFileDossier')
+  createFileDossier(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.createFileDossier(affiliateId);
   }
 
-  @MessagePattern('affiliate.findAllDocuments')
-  findAllDocuments() {
-    return this.affiliatesService.findAllDocuments();
+  @MessagePattern('affiliate.createDocument')
+  createDocument(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
+    return this.affiliatesService.createDocument(affiliateId);
+  }
+
+  @MessagePattern('affiliate.deleteDocument')
+  deleteDocument(
+    @Payload('affiliateId', ParseIntPipe) affiliateId: number,
+    @Payload('procedureDocumentId', ParseIntPipe) procedureDocumentId: number,
+  ) {
+    return this.affiliatesService.deleteDocument(affiliateId, procedureDocumentId);
   }
 
   @MessagePattern('affiliate.showFileDossiers')
@@ -83,12 +99,20 @@ export class AffiliatesController {
     return this.affiliatesService.findFileDossier(affiliateId, fileDossierId);
   }
 
-  @MessagePattern('affiliate.createOrUpdateFileDossier')
-  async createOrUpdateFileDossier(
+  @MessagePattern('affiliate.createAffiliateFileDossier')
+  async createAffiliateFileDossier(
     @Payload() payload: { affiliateId: string; fileDossierId: string },
   ) {
     const { affiliateId, fileDossierId } = payload;
-    return this.affiliatesService.createOrUpdateFileDossier(+affiliateId, +fileDossierId);
+    return this.affiliatesService.createAffiliateFileDossier(+affiliateId, +fileDossierId);
+  }
+
+  @MessagePattern('affiliate.updateAffiliateFileDossier')
+  async updateAffiliateFileDossier(
+    @Payload() payload: { affiliateId: string; fileDossierId: string },
+  ) {
+    const { affiliateId, fileDossierId } = payload;
+    return this.affiliatesService.updateAffiliateFileDossier(+affiliateId, +fileDossierId);
   }
 
   @MessagePattern('affiliate.deleteFileDossier')
