@@ -1,13 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsDate,
-  IsInt,
-  IsNumber,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
+import { IsBoolean, IsDate, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreatePersonDto {
   @IsString()
