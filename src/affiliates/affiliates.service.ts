@@ -66,77 +66,57 @@ export class AffiliatesService {
     };
   }
 
-  async createAffiliateDocument(affiliateId: number, procedureDocumentId: number): Promise<any> {
-    const [document, affiliateDocuments] = await Promise.all([
+  async createOrUpdateDocument(affiliateId: number, procedureDocumentId: number): Promise<any> {
+    const [document, affiliate] = await Promise.all([
       this.nats.firstValue('procedureDocuments.findOne', { id: procedureDocumentId }),
-      this.affiliateDocumentsRepository.findOne({
-        where: {
-          affiliateId,
-          procedureDocumentId,
-        },
-      }),
+      this.findAndVerifyAffiliateWithRelationOneCondition(
+        affiliateId,
+        'affiliateDocuments',
+        'procedureDocumentId',
+        procedureDocumentId,
+      ),
     ]);
 
     const initialPath = `${envsFtp.ftpDocuments}/${affiliateId}/`;
 
     if (document.serviceStatus === false) {
       return {
-        error: true,
+        serviceStatus: document.serviceStatus,
         message: document.message || 'Servicio de documentos no disponible',
       };
     }
 
-    if (affiliateDocuments) {
-      return {
-        error: true,
-        message: 'Intento de creación de un documento ya existente',
-      };
+    let affiliateDocument: AffiliateDocument;
+    let response: string;
+
+    if (affiliate.affiliateDocuments.length === 0) {
+      affiliateDocument = new AffiliateDocument();
+      affiliateDocument.affiliate = affiliate;
+      affiliateDocument.procedureDocumentId = procedureDocumentId;
+      response = 'creado';
+    } else {
+      affiliateDocument = affiliate.affiliateDocuments[0];
+      affiliateDocument.updatedAt = new Date();
+      response = 'actualizado';
     }
 
-    const affiliateDocument = new AffiliateDocument();
-    affiliateDocument.affiliateId = affiliateId;
-    affiliateDocument.procedureDocumentId = procedureDocumentId;
     affiliateDocument.path = `${initialPath}${document.shortened ?? document.name}.pdf`;
+
+    const affiliateDocuments = [
+      {
+        fileId: affiliateDocument.procedureDocumentId,
+        path: affiliateDocument.path,
+      },
+    ];
+
+    affiliate.affiliateDocuments.push(affiliateDocument);
+
     await this.affiliateDocumentsRepository.save(affiliateDocument);
 
     return {
-      error: false,
-      message: `Documento ${document.shortened} registrado`,
-      affiliateDocuments: [
-        {
-          fileId: affiliateDocument.procedureDocumentId,
-          path: affiliateDocument.path,
-        },
-      ],
-    };
-  }
-
-  async updateAffiliateDocument(affiliateId: number, procedureDocumentId: number): Promise<any> {
-    const affiliateDocument = await this.affiliateDocumentsRepository.findOne({
-      where: { affiliateId, procedureDocumentId },
-    });
-
-    if (!affiliateDocument) {
-      return {
-        error: true,
-        message: 'Intento de actualización de un documento no existente',
-        affiliateDocuments: [],
-      };
-    }
-
-    affiliateDocument.updatedAt = new Date();
-    await this.affiliateDocumentsRepository.save(affiliateDocument);
-    const fileName = affiliateDocument.path.split('/').pop();
-
-    return {
-      error: false,
-      message: `Documento ${fileName} actualizado`,
-      affiliateDocuments: [
-        {
-          fileId: affiliateDocument.procedureDocumentId,
-          path: affiliateDocument.path,
-        },
-      ],
+      serviceStatus: document.serviceStatus,
+      message: `${document.shortened} ${response} exitosamente`,
+      affiliateDocuments,
     };
   }
 
@@ -196,67 +176,6 @@ export class AffiliatesService {
     if (affiliateDocuments.length === 0)
       throw new RpcException({ message: 'Document not found', code: 404 });
     return affiliateDocuments;
-  }
-
-  // TODO: Revisar sql para refactorizar el sql cuando se creen los demas microservicios
-  async deleteDocument(affiliateId: number, procedureDocumentId: number): Promise<any> {
-    const documents = await this.affiliateDocumentsRepository.findOne({
-      where: { affiliateId, procedureDocumentId },
-      select: ['path'],
-    });
-
-    if (!documents) {
-      return {
-        error: true,
-        paths: [],
-        message: 'Intento de eliminación de un documento no existente',
-      };
-    }
-
-    const uploadedDocs = await this.affiliateDocumentsRepository.query(
-      `
-        SELECT source FROM (
-          SELECT 'ret_fun' AS source, pr.procedure_document_id
-          FROM ret_fun_submitted_documents s
-          JOIN procedure_requirements pr ON pr.id = s.procedure_requirement_id
-          JOIN retirement_funds rf ON rf.id = s.retirement_fund_id
-          WHERE s.is_uploaded = TRUE and rf.affiliate_id = $2
-
-          UNION ALL
-
-          SELECT 'quota_aid' AS source, pr.procedure_document_id
-          FROM quota_aid_submitted_documents s
-          JOIN procedure_requirements pr ON pr.id = s.procedure_requirement_id
-          JOIN quota_aid_mortuaries qm ON qm.id = s.quota_aid_mortuary_id
-          WHERE s.is_uploaded = TRUE and qm.affiliate_id = $2
-
-          UNION ALL
-
-          SELECT 'eco_com' AS source, pr.procedure_document_id
-          FROM eco_com_submitted_documents s
-          JOIN procedure_requirements pr ON pr.id = s.procedure_requirement_id
-          JOIN economic_complements ec ON ec.id = s.economic_complement_id
-          WHERE s.is_uploaded = TRUE and ec.affiliate_id = $2
-        ) AS t
-        WHERE t.procedure_document_id = $1
-        LIMIT 1;
-      `,
-      [procedureDocumentId, affiliateId],
-    );
-
-    const name = documents.path.split('/').pop();
-
-    if (uploadedDocs.length > 0) {
-      return {
-        error: true,
-        paths: [],
-        message: `No se puede eliminar ${name} porque esta siendo utilizada en tramites de Beneficios`,
-      };
-    }
-
-    await this.affiliateDocumentsRepository.delete({ affiliateId, procedureDocumentId });
-
-    return { error: false, paths: [documents.path], message: `Documento ${name} eliminado` };
   }
 
   async collateDocuments(affiliateId: number, modalityId: number): Promise<any> {
@@ -409,7 +328,7 @@ export class AffiliatesService {
         initialFolder.filesValidFolder += documents.length;
         const [validDocuments, dataPerson] = await Promise.all([
           this.dataSource.query(
-            `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`,
+            `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`
           ),
           this.affiliateIdForPersonId(affiliateId.id),
         ]);
@@ -534,7 +453,7 @@ export class AffiliatesService {
             `(${file.affiliate_id}, ${file.procedure_document_id}, '${file.newPath}')`,
           );
           insertsRecords.push(
-            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','Documento importado, ${file.shortened} registrado por ${data.user.name}.','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se creó el documento ${file.shortened} exitosamente."}',${file.personId})`,
+            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','${data.user.name} creó el documento ${file.shortened} al beneficiario con NUP ${file.affiliate_id} por importación','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se creó el documento ${file.shortened} exitosamente."}',${file.personId})`,
           );
           contNewFiles++;
         }
@@ -553,7 +472,7 @@ export class AffiliatesService {
           });
 
           insertsRecords.push(
-            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','Documento importado, ${file.shortened} actualizado por ${data.user.name}.','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se actualizó el documento ${file.shortened} exitosamente."}',${file.personId})`,
+            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','${data.user.name} actualizó el documento ${file.shortened} al beneficiario con NUP ${file.affiliate_id} por importación','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se actualizó el documento ${file.shortened} exitosamente."}',${file.personId})`,
           );
           const queryExist = `
             UPDATE beneficiaries.affiliate_documents
@@ -584,7 +503,7 @@ export class AffiliatesService {
       newFiles: contNewFiles,
       updateFIles: contExistFiles,
       totalFiles: contNewFiles + contExistFiles,
-      message: `Realizó la importación de documentos, ${contNewFiles} nuevos archivos, ${contExistFiles} archivos actualizados.`,
+      message: `${contNewFiles} nuevos archivos, ${contExistFiles} archivos actualizados.`,
     };
   }
 
@@ -632,66 +551,12 @@ export class AffiliatesService {
     return { serviceStatus: fileDossierNames.serviceStatus, fileDossiersAffiliate };
   }
 
-  async createFileDossier(affiliateId: number) {
-    const dataExist = await this.affiliateFileDossierRepository.find({
-      where: {
-        affiliateId,
-      },
-    });
-    const disableData = dataExist.map((d) => d.fileDossierId.toString());
-    const { data, serviceStatus } = await this.nats.firstValue('fileDossiers.findAll', [
-      'id',
-      'name',
-      'shortened',
-    ]);
-
-    if (!serviceStatus) {
-      return {
-        error: true,
-        data: [],
-        message: 'Servicio de expedientes no disponible',
-      };
-    }
-
-    return {
-      error: false,
-      data: {
-        allData: data,
-        disableData,
-      },
-      message: 'Datos para creación de expedientes',
-    };
+  async findAllFileDossiers() {
+    return this.nats.firstValue('fileDossiers.findAll', ['id', 'name', 'shortened']);
   }
 
-  async createDocument(affiliateId: number) {
-    const dataExist = await this.affiliateDocumentsRepository.find({
-      where: {
-        affiliateId,
-      },
-    });
-    const disableData = dataExist.map((d) => d.procedureDocumentId.toString());
-    const { data, serviceStatus } = await this.nats.firstValue('procedureDocuments.findAll', [
-      'id',
-      'name',
-      'shortened',
-    ]);
-
-    if (!serviceStatus) {
-      return {
-        error: true,
-        data: [],
-        message: 'Servicio de documentos no disponible',
-      };
-    }
-
-    return {
-      error: false,
-      data: {
-        allData: data,
-        disableData,
-      },
-      message: 'Datos para creación de documentos',
-    };
+  async findAllDocuments() {
+    return this.nats.firstValue('procedureDocuments.findAll', ['id', 'name', 'shortened']);
   }
 
   async findFileDossier(
@@ -710,10 +575,10 @@ export class AffiliatesService {
     return AffiliateFileDossier;
   }
 
-  async createAffiliateFileDossier(affiliateId: number, fileDossierId: number): Promise<any> {
+  async createOrUpdateFileDossier(affiliateId: number, fileDossierId: number): Promise<any> {
     const [fileDossier, affiliateFileDossiers] = await Promise.all([
       this.nats.firstValue('fileDossiers.findOne', { id: fileDossierId }),
-      this.affiliateFileDossierRepository.findOne({
+      this.affiliateFileDossierRepository.find({
         where: {
           affiliateId,
           fileDossierId,
@@ -722,89 +587,64 @@ export class AffiliatesService {
     ]);
 
     const initialPath = `${envsFtp.ftpFileDossiers}/${affiliateId}/`;
-
     if (fileDossier.serviceStatus === false) {
       return {
-        error: true,
-        message: `Intento de crear expediente pero el servicio de archivos no estaba disponible`,
+        serviceStatus: fileDossier.serviceStatus,
+        message: fileDossier.message || 'Servicio de expedientes no disponible',
       };
     }
 
-    if (affiliateFileDossiers) {
-      return {
-        error: true,
-        message: `Intento crear expediente de ${fileDossier.name} ya existente`,
-      };
-    }
+    let affiliateFileDossier: AffiliateFileDossier;
+    let response: string;
 
-    const affiliateFileDossier = new AffiliateFileDossier();
-    affiliateFileDossier.affiliateId = affiliateId;
-    affiliateFileDossier.fileDossierId = fileDossierId;
+    if (affiliateFileDossiers.length === 0) {
+      affiliateFileDossier = new AffiliateFileDossier();
+      affiliateFileDossier.affiliateId = affiliateId;
+      affiliateFileDossier.fileDossierId = fileDossierId;
+      response = 'Creado';
+    } else {
+      affiliateFileDossier = affiliateFileDossiers[0];
+      affiliateFileDossier.updatedAt = new Date();
+      response = 'Actualizado';
+    }
 
     affiliateFileDossier.path = `${initialPath}${fileDossier.shortened ?? fileDossier.name}.pdf`;
+
+    const fileDossiers = [
+      {
+        fileId: affiliateFileDossier.fileDossierId,
+        path: affiliateFileDossier.path,
+      },
+    ];
+
     await this.affiliateFileDossierRepository.save(affiliateFileDossier);
-
     return {
-      error: false,
-      message: `Expediente de ${fileDossier.name} registrado`,
-      affiliateFileDossiers: [
-        {
-          fileId: affiliateFileDossier.fileDossierId,
-          path: affiliateFileDossier.path,
-        },
-      ],
-    };
-  }
-
-  async updateAffiliateFileDossier(affiliateId: number, fileDossierId: number): Promise<any> {
-    const affiliateFileDossier = await this.affiliateFileDossierRepository.findOne({
-      where: { affiliateId, fileDossierId },
-    });
-
-    if (!affiliateFileDossier) {
-      return {
-        error: true,
-        message: `Intento de actualización de expediente, pero no existe para este afiliado.`,
-      };
-    }
-
-    const fileName = affiliateFileDossier.path.split('/').pop();
-    affiliateFileDossier.updatedAt = new Date();
-    await this.affiliateFileDossierRepository.save(affiliateFileDossier);
-
-    return {
-      error: false,
-      message: `Expediente de ${fileName} actualizado`,
-      affiliateFileDossiers: [
-        {
-          fileId: affiliateFileDossier.fileDossierId,
-          path: affiliateFileDossier.path,
-        },
-      ],
+      serviceStatus: fileDossier.serviceStatus,
+      message: `${fileDossier.name} ${response} exitosamente`,
+      affiliateFileDossiers: fileDossiers,
     };
   }
 
   async deleteFileDossier(affiliateId: number, fileDossierId: number): Promise<any> {
-    const fileDossiers = await this.affiliateFileDossierRepository.findOne({
+    const fileDossiers = await this.affiliateFileDossierRepository.find({
       where: { affiliateId, fileDossierId },
       select: ['path'],
     });
 
-    if (!fileDossiers) {
+    if (fileDossiers.length === 0)
       return {
-        error: true,
         paths: [],
-        message: `Intento de eliminación de un expediente no existente`,
+        message: 'No existe el expediente para eliminar',
       };
-    }
 
-    const fileName = fileDossiers.path.split('/').pop();
-    this.affiliateFileDossierRepository.delete({ affiliateId, fileDossierId });
-    return {
-      error: false,
-      paths: [fileDossiers.path],
-      message: `Expediente de ${fileName} eliminado`,
-    };
+    const paths = fileDossiers.map((f) => f.path);
+
+    const [{ name }] = await Promise.all([
+      this.nats.firstValue('fileDossiers.findOne', { id: fileDossierId }),
+      this.affiliateFileDossierRepository.delete({ affiliateId, fileDossierId }),
+    ]);
+
+    return { paths, message: `Expediente ${name} eliminado exitosamente` };
   }
 
   public async affiliateIdForPersonId(affiliateId: number): Promise<{ personId: number }> {
@@ -829,6 +669,26 @@ export class AffiliatesService {
       where: { id },
       relations: relations.length > 0 ? relations : [],
     });
+    if (!affiliate) {
+      throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
+    }
+    return affiliate;
+  }
+
+  private async findAndVerifyAffiliateWithRelationOneCondition(
+    id: number,
+    relation: string,
+    column: string,
+    data: any,
+  ): Promise<Affiliate | null> {
+    const affiliate = await this.affiliateRepository
+      .createQueryBuilder('affiliate')
+      .leftJoinAndSelect(`affiliate.${relation}`, 'relation', `relation.${column} = :data`, {
+        data,
+      })
+      .where('affiliate.id = :id', { id })
+      .getOne();
+
     if (!affiliate) {
       throw new RpcException({ message: `Affiliate with ID: ${id} not found`, code: 404 });
     }
