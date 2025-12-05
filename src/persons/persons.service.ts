@@ -138,7 +138,6 @@ export class PersonsService {
         where: { id: affiliateReference[0].typeId },
       });
 
-      if (person.dateDeath !== null) {
         const affiliate = await this.personAffiliateRepository.find({
           where: { personId: person.id, type: 'affiliates' },
         });
@@ -153,17 +152,7 @@ export class PersonsService {
             pensionEntityId: person.pensionEntityId,
           };
         }
-      } else {
-        return {
-          affiliateId: null,
-          isPolice: false,
-          validateStatus: false,
-          message:
-            'La persona titular no se encuentra fallecida, pasar por oficinas de la MUSERPOL',
-        };
-      }
     }
-
     return {
       affiliateId: null,
       isPolice: false,
