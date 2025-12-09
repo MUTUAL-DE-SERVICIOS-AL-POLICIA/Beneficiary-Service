@@ -6,7 +6,6 @@ import { es } from 'date-fns/locale';
 import { NatsService } from 'src/common';
 import { envsFtp } from 'src/config/envs';
 import { Repository } from 'typeorm';
-import { UpdatePersonDto } from './dto';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
 
@@ -169,7 +168,18 @@ export class PersonsService {
   async findAll(filteredPaginationDto: FilteredPaginationDto) {
     const { limit = 10, page = 1, filter, orderBy = 'id', order = 'ASC' } = filteredPaginationDto;
     const offset = (page - 1) * limit;
-    const query = this.personRepository.createQueryBuilder('person');
+    const query = this.personRepository
+      .createQueryBuilder('person')
+      .select([
+        'person.id',
+        'person.firstName',
+        'person.secondName',
+        'person.lastName',
+        'person.mothersLastName',
+        'person.identityCard',
+        'person.gender',
+        'person.uuidColumn',
+      ]);
     const filterValues = filter?.split(' ');
     if (Array.isArray(filterValues) && filterValues.length > 0) {
       const identityConditions: string[] = [];
@@ -218,6 +228,8 @@ export class PersonsService {
     const [persons, total] = await query.getManyAndCount();
 
     return {
+      error: false,
+      message: 'Personas obtenidas',
       persons,
       total,
     };
@@ -239,26 +251,6 @@ export class PersonsService {
       });
     }
     return person;
-  }
-
-  async update(id: number, person: UpdatePersonDto) {
-    const result = await this.personRepository.update(id, person);
-
-    if (result.affected === 0) {
-      throw new NotFoundException(`Person with id: ${id} not found`);
-    }
-
-    return { message: 'Person updated successfully' };
-  }
-
-  async remove(id: number) {
-    const person = this.personRepository.findOneBy({ id });
-    if (person) {
-      await this.personRepository.softDelete(id);
-      return `This action removes a #${id} person`;
-    } else {
-      throw new NotFoundException(`Person with: ${id} not found`);
-    }
   }
 
   async findPersonAffiliatesWithDetails(uuid: string): Promise<any> {
@@ -430,14 +422,13 @@ export class PersonsService {
       Promise.resolve({ success: [], error: [] }),
     );
     let message = '';
-    const fullName = await this.fullname(person);
 
     if (uploadResults.success.length > 0 && uploadResults.error.length > 0) {
-      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente para ${fullName}.`;
+      message = `Algunas huellas fueron registradas y otras no debido a calidad duplicada o insuficiente`;
     } else if (uploadResults.success.length > 0) {
-      message = `Las huellas se han registrado correctamente para ${fullName}.`;
+      message = `Las huellas se han registrado correctamente`;
     } else {
-      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente para ${fullName}.`;
+      message = `No se registraron huellas porque ya existían con las mismas calidades o porque la calidad era insuficiente`;
     }
 
     return {
@@ -537,9 +528,93 @@ export class PersonsService {
     };
   }
 
+  async getPersonRecords(personId: number): Promise<any> {
+    const { serviceStatus, data } = await this.nats.firstValue('beneficiaries.record.findPerson', {
+      personId,
+    });
+
+    if (!serviceStatus) {
+      return {
+        error: true,
+        message: 'Servicio de Registros de beneficiarios no disponible',
+        data: [],
+      };
+    }
+
+    return {
+      error: false,
+      message: 'Historial de beneficiario obtenido',
+      data,
+    };
+  }
+
   private async fullname(person: Person): Promise<string> {
     return [person.firstName, person.secondName, person.lastName, person.mothersLastName]
       .filter(Boolean)
       .join(' ');
+  }
+
+  public async search(value: string, type: string): Promise<any> {
+    try {
+      if (type === 'affiliate') {
+        const res = await this.personAffiliateRepository.findOne({
+          where: {
+            typeId: Number(value),
+            type: 'affiliates',
+          },
+          relations: {
+            person: true,
+          },
+        });
+
+        if (!res) {
+          return {
+            error: true,
+            message: 'No existe un policía con este NUP',
+          };
+        }
+
+        return {
+          error: false,
+          message: 'Policía encontrada con NUP',
+          data: {
+            uuidColum: res.person.uuidColumn,
+          },
+        };
+      }
+
+      if (type === 'person') {
+        const res = await this.personRepository.findOne({
+          where: {
+            identityCard: value.toUpperCase(),
+          },
+        });
+
+        if (!res) {
+          return {
+            error: true,
+            message: 'No existe una persona con este Carnet de Identidad',
+          };
+        }
+
+        return {
+          error: false,
+          message: 'Persona encontrada con Carnet de Identidad',
+          data: {
+            uuidColum: res.uuidColumn,
+          },
+        };
+      }
+
+      return {
+        error: true,
+        message: 'Error al seleccionar el tipo de búsqueda',
+      };
+    } catch {
+      return {
+        error: true,
+        message: 'No se encontraron coincidencias',
+      };
+    }
   }
 }

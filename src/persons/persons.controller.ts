@@ -1,6 +1,5 @@
 import { Controller, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
 import { PersonsService } from './persons.service';
-import { UpdatePersonDto } from './dto/update-person.dto';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
 
@@ -16,11 +15,6 @@ export class PersonsController {
   @MessagePattern('person.findOne')
   async findOne(@Payload('term') term: string, @Payload('field') field: string) {
     return this.personsService.findOnePerson(term, field);
-  }
-
-  @MessagePattern('person.update')
-  update(@Payload() person: UpdatePersonDto) {
-    return this.personsService.update(person.id, person);
   }
 
   @MessagePattern('person.findOneWithFeatures')
@@ -81,5 +75,15 @@ export class PersonsController {
   @MessagePattern('person.getPersonIdByAffiliate')
   async getPersonIdByAffiliate(@Payload('affiliateId', ParseIntPipe) affiliateId: number) {
     return this.personsService.getPersonIdByAffiliate(affiliateId);
+  }
+
+  @MessagePattern('person.getPersonRecords')
+  async getPersonRecords(@Payload('personId', ParseIntPipe) personId: number) {
+    return this.personsService.getPersonRecords(personId);
+  }
+
+  @MessagePattern('person.search')
+  async search(@Payload('value') value: string, @Payload('type') type: string) {
+    return this.personsService.search(value, type);
   }
 }
