@@ -7,6 +7,11 @@ import { FilteredPaginationDto } from './dto/filter-person.dto';
 export class PersonsController {
   constructor(private readonly personsService: PersonsService) {}
 
+  @MessagePattern('person.update')
+  async update(@Payload('id', ParseIntPipe) id: number, @Payload('data') data: any) {
+    return this.personsService.update(id, data);
+  }
+
   @MessagePattern('person.findAll')
   findAll(@Payload() filteredPaginationDto: FilteredPaginationDto) {
     return this.personsService.findAll(filteredPaginationDto);
