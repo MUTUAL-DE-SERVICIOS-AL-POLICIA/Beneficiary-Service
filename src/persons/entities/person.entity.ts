@@ -34,7 +34,7 @@ export class Person {
   })
   financialEntityId: number;
 
-  @Column('varchar',{
+  @Column('varchar', {
     length: 255,
   })
   firstName: string;
@@ -134,6 +134,12 @@ export class Person {
     nullable: true,
   })
   idPersonSenasir: number;
+
+  @Column('varchar', {
+    length: 255,
+    nullable: true,
+  })
+  email: string;
 
   @OneToMany(() => PersonAffiliate, (personAffiliate) => personAffiliate.person)
   personAffiliates: PersonAffiliate[];
