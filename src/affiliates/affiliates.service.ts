@@ -280,7 +280,6 @@ export class AffiliatesService {
 
     const affiliateDocumentsSet = new Set(affiliateDocuments.map((doc) => doc.procedureDocumentId));
     const requiredDocuments = new Map<number, any[]>();
-    const additionallyDocumentsUpload: any[] = [];
     const additionallyDocuments: any[] = [];
 
     for (const { procedureDocument, id, number } of procedureRequirements) {
@@ -291,12 +290,11 @@ export class AffiliatesService {
         name: procedureDocument.name,
         shortened: procedureDocument.shortened,
         isUploaded: affiliateDocumentsSet.has(procedureDocument.id),
+        status: false,
       };
 
-      if (number === 0) {
-        (documentData.isUploaded ? additionallyDocumentsUpload : additionallyDocuments).push(
-          documentData,
-        );
+      if (number === 0) { 
+        additionallyDocuments.push(documentData);
       } else {
         if (!requiredDocuments.has(number)) {
           requiredDocuments.set(number, []);
@@ -305,17 +303,9 @@ export class AffiliatesService {
       }
     }
 
-    requiredDocuments.forEach((docs, key) => {
-      requiredDocuments.set(
-        key,
-        docs.some((doc) => doc.isUploaded) ? [docs.find((doc) => doc.isUploaded)!] : docs,
-      );
-    });
-
     return {
       serviceStatus: modality.serviceStatus,
       requiredDocuments: Object.fromEntries(requiredDocuments),
-      additionallyDocumentsUpload,
       additionallyDocuments,
     };
   }
