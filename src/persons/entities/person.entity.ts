@@ -135,6 +135,12 @@ export class Person {
   })
   idPersonSenasir: number;
 
+  @Column('varchar', {
+    length: 255,
+    nullable: true,
+  })
+  email: string;
+
   @OneToMany(() => PersonAffiliate, (personAffiliate) => personAffiliate.person)
   personAffiliates: PersonAffiliate[];
 

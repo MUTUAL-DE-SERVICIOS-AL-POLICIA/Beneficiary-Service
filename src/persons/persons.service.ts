@@ -137,32 +137,21 @@ export class PersonsService {
         where: { id: affiliateReference[0].typeId },
       });
 
-      if (person.dateDeath !== null) {
-        const affiliate = await this.personAffiliateRepository.find({
-          where: { personId: person.id, type: 'affiliates' },
-        });
+      const affiliate = await this.personAffiliateRepository.find({
+        where: { personId: person.id, type: 'affiliates' },
+      });
 
-        if (affiliate.length > 0) {
-          return {
-            affiliateId: affiliate[0].typeId,
-            isPolice: false,
-            validateStatus: true,
-            message: 'afiliado de la persona verificada',
-            kinshipId: affiliateReference[0].kinshipType,
-            pensionEntityId: person.pensionEntityId,
-          };
-        }
-      } else {
+      if (affiliate.length > 0) {
         return {
-          affiliateId: null,
+          affiliateId: affiliate[0].typeId,
           isPolice: false,
-          validateStatus: false,
-          message:
-            'La persona titular no se encuentra fallecida, pasar por oficinas de la MUSERPOL',
+          validateStatus: true,
+          message: 'afiliado de la persona verificada',
+          kinshipId: affiliateReference[0].kinshipType,
+          pensionEntityId: person.pensionEntityId,
         };
       }
     }
-
     return {
       affiliateId: null,
       isPolice: false,
@@ -262,6 +251,22 @@ export class PersonsService {
       });
     }
     return person;
+  }
+
+  async update(id: number, data: any): Promise<any> {
+    const person = await this.personRepository.findOne({ where: { id } });
+    if (!person) {
+      throw new RpcException({
+        code: 404,
+        message: `Persona: ${id} no encontrada`,
+      });
+    }
+    this.personRepository.merge(person, data);
+    await this.personRepository.save(person);
+    return {
+      message: 'Persona actualizada correctamente',
+      person,
+    };
   }
 
   async findPersonAffiliatesWithDetails(uuid: string): Promise<any> {
