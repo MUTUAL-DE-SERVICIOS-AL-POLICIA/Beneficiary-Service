@@ -6,7 +6,7 @@ import { AffiliatesModule } from './affiliates/affiliates.module';
 import { DatabaseModule } from './database/database.module';
 
 @Module({
-  imports: [ConfigModule.forRoot(), DatabaseModule, PersonsModule, CommonModule, AffiliatesModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), DatabaseModule, PersonsModule, CommonModule, AffiliatesModule],
   controllers: [],
   providers: [],
 })
