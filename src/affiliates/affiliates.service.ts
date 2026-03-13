@@ -221,6 +221,7 @@ export class AffiliatesService {
           JOIN procedure_requirements pr ON pr.id = s.procedure_requirement_id
           JOIN retirement_funds rf ON rf.id = s.retirement_fund_id
           WHERE s.is_uploaded = TRUE and rf.affiliate_id = $2
+          AND s.deleted_at IS NULL
 
           UNION ALL
 
@@ -229,6 +230,7 @@ export class AffiliatesService {
           JOIN procedure_requirements pr ON pr.id = s.procedure_requirement_id
           JOIN quota_aid_mortuaries qm ON qm.id = s.quota_aid_mortuary_id
           WHERE s.is_uploaded = TRUE and qm.affiliate_id = $2
+          AND s.deleted_at IS NULL
 
           UNION ALL
 
