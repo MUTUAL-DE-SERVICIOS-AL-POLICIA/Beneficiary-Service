@@ -1,49 +1,66 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# Beneficiary-Service
 
-1. Clonar proyecto
-2. ```yarn install```
-3. Clonar el archivo ```.env.template``` y renombrarlo a ```.env```
-4. Cambiar las variables de entorno
+## Descripción
 
-5. Levantar: ```yarn start:dev```
+**Beneficiary-Service** es un microservicio que gestiona la información de los beneficiarios y afiliados de la plataforma. Los beneficiarios son las personas que tienen cobertura o derechos a través de un afiliado (policía activo o jubilado), incluyendo cónyuge, hijos y otros dependientes que requieren servicios médicos o administrativos.
 
-## Seeders 
-https://github.com/tada5hi/typeorm-extension
-
-Los seeders usando typeORM pueden ser ejecutadas **una sola vez**, como las migraciones de Laravel, el registro de las migraciones se guarda en una tabla llamada *seeds.*
-
-Para que los seeders se ejecuten una sola vez tienen que tener la opcion
-
-Para crear un seeder:
-
-```bash
-yarn seed:create --name src/database/seeds/nombre-del-seeder.ts
-```
-
-El numeral unix podemos eliminarlo del nombre de la clase, pero no del nombre del archivo, ya que typeORM usa el mismo para guardar la información de ejecución en la base de datos.
+Maneja datos como:
+- Información personal de beneficiarios
+- Gestión de documentos y expedientes
+- Huellas dactilares y biometría
+- Relaciones entre afiliados y beneficiarios
 
 ---
 
-Para ejecutar todos los seeders:
+## Clonar el repositorio y agregarle un nombre nuevo del nuevo proyecto
 
 ```bash
-yarn seed:run
+git clone https://github.com/MUTUAL-DE-SERVICIOS-AL-POLICIA/Beneficiary-Service.git nombre-beneficiary-service
 ```
 
-Para ejecutar un seeder:
+## Inicializar proyecto
 
 ```bash
- yarn seed:run --name src/database/seeds/nombre-del-seeder.ts
-```
+# Entrar al repositorio clonado con el nuevo nombre del proyecto
+cd nombre-beneficiary-service
 
-## Migración
+# Elimina el origen remoto actual
+git remote remove origin
+
+# Crear el archivo .env en base al .env.template
+cp .env.template .env
+
+# Instalar las dependencias
+pnpm install
+
+# Correr proyecto en modo desarrollo
+pnpm start:dev
+
+# Crear nuevo Módulo
+nest g res nombreModulo
+
+# Crear un seeder
+pnpm seed:create --name src/database/seeds/nombre_seed.ts
+
+# Correr seeder
+pnpm seed:run --name src/database/seeds/{code}-nombre_seed.ts
+
 # Crear migración
-yarn typeorm migration:create src/database/migrations/NombreDeLaMigración
+pnpm typeorm migration:create src/database/migrations/NombreDeLaMigración
+
 # Correr migración
-yarn migration:run
+pnpm migration:run
+
 # Revertir migración
-yarn migration:revert
+pnpm migration:revert
+
 # Ver estado de migraciones
-yarn migration:show
+pnpm migration:show
+
+# Para enlazar a un nuevo repositorio
+git remote add origin https://github.com/tu-usuario/{nombre-beneficiary-service}.git
+git add .
+git commit -m "Inicialización del nuevo proyecto"
+git branch -M main
+git push -u origin main
+```
