@@ -2,13 +2,45 @@
 
 ## Descripción
 
-**Beneficiary-Service** es un microservicio que gestiona la información de los beneficiarios y afiliados de la plataforma. Los beneficiarios son las personas que tienen cobertura o derechos a través de un afiliado (policía activo o jubilado), incluyendo cónyuge, hijos y otros dependientes que requieren servicios médicos o administrativos.
+**Beneficiary-Service** es un microservicio especializado que gestiona la información de los beneficiarios y afiliados de la plataforma. Los beneficiarios son las personas que tienen cobertura o derechos a través de un afiliado (policía activo o jubilado), incluyendo cónyuge, hijos y otros dependientes que requieren servicios médicos o administrativos. Forma parte de una arquitectura de microservicios basada en **NestJS** y utiliza **NATS** para la comunicación asincrónica entre servicios.
 
 Maneja datos como:
 - Información personal de beneficiarios
 - Gestión de documentos y expedientes
 - Huellas dactilares y biometría
 - Relaciones entre afiliados y beneficiarios
+- Sincronización con sistemas FTP de almacenamiento
+
+---
+
+## Estructura del Proyecto
+
+```
+src/
+├── app.module.ts                 # Módulo raíz que organiza todos los módulos de la aplicación
+├── main.ts                       # Punto de entrada principal de la aplicación
+├── beneficiary/                  # Módulo principal de gestión de beneficiarios
+│   ├── controllers/              # Controladores que manejan rutas de beneficiarios
+│   ├── services/                 # Servicios con la lógica de negocio
+│   └── dto/                      # Data Transfer Objects para validación de datos
+├── ftp/                          # Módulo de integración con servidor FTP
+│   ├── ftp.service.ts            # Servicio para gestionar archivos en FTP
+│   └── ftp.config.ts             # Configuración de conexión FTP
+├── document/                     # Módulo de gestión de documentos
+│   ├── controllers/              # Controladores de documentos
+│   ├── services/                 # Servicios de validación y procesamiento
+│   └── dto/                      # Validación de datos de documentos
+├── common/                       # Código compartido reutilizable en toda la aplicación
+│   ├── filters/                  # Filtros para manejo de excepciones
+│   ├── guards/                   # Guards para proteger rutas
+│   └── decorators/               # Decoradores personalizados
+├── config/                       # Archivos de configuración (BD, variables ENV, etc)
+│   └── database.config.ts        # Configuración específica de PostgreSQL
+├── database/                     # Gestión de base de datos, migraciones y datos iniciales
+│   ├── migrations/               # Migraciones TypeORM para cambios en el esquema BD
+│   ├── seeds/                    # Seeders para llenar BD con datos de prueba
+│   └── entities/                 # Entidades (modelos) que representan tablas de la BD
+```
 
 ---
 
