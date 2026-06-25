@@ -92,8 +92,4 @@ export class PersonsController {
     return this.personsService.search(value, type);
   }
 
-  @MessagePattern('person.searchSales')
-  async searchPersonSales(@Payload('value') value: string, @Payload('type') type: string) {
-    return this.personsService.search(value, type);
-  }
 }
