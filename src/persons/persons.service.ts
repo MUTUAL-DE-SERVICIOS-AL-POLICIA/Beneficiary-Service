@@ -321,6 +321,51 @@ export class PersonsService {
     };
   }
 
+  async findPersonForCreatingSaleById(id: number): Promise<any> {
+    const person = await this.personRepository
+      .createQueryBuilder('person')
+      .leftJoinAndSelect(
+        'person.personAffiliates',
+        'personAffiliates',
+        'personAffiliates.type = :affiliateType',
+        { affiliateType: 'affiliates' },
+      )
+      .select([
+        'person.id',
+        'person.uuidColumn',
+        'person.firstName',
+        'person.secondName',
+        'person.lastName',
+        'person.mothersLastName',
+        'person.identityCard',
+        'personAffiliates.id',
+        'personAffiliates.type',
+        'personAffiliates.typeId',
+      ])
+      .where('person.id = :id', { id })
+      .getOne();
+
+    if (!person) {
+      throw new RpcException({
+        code: 404,
+        message: `Persona: ${id} no encontrada`,
+      });
+    }
+
+    const affiliate = person.personAffiliates?.find((item) => item.type === 'affiliates');
+
+    return {
+      id: person.id,
+      uuidColumn: person.uuidColumn,
+      fullName: [person.firstName, person.secondName, person.lastName, person.mothersLastName]
+        .filter(Boolean)
+        .join(' '),
+      identityCard: person.identityCard ?? '',
+      nup: affiliate?.typeId ?? null,
+      isPolice: Boolean(affiliate),
+    };
+  }
+
   async findAffiliates(id: number): Promise<any> {
     const affiliatesResponse = await this.personAffiliateRepository
       .createQueryBuilder('pa')
