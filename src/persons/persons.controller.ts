@@ -27,6 +27,11 @@ export class PersonsController {
     return this.personsService.findPersonAffiliatesWithDetails(uuid);
   }
 
+  @MessagePattern('person.findForCreatingSaleById')
+  async findPersonForCreatingSaleById(@Payload('id', ParseIntPipe) id: number) {
+    return this.personsService.findPersonForCreatingSaleById(id);
+  }
+
   @MessagePattern('person.findAffiliates')
   async findAffiliates(@Payload('id', ParseIntPipe) id: number) {
     return this.personsService.findAffiliates(id);
