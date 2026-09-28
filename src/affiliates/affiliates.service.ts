@@ -1,11 +1,42 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginationDto, NatsService } from 'src/common';
-import { Repository } from 'typeorm';
-import { Affiliate, AffiliateDocument, AffiliateFileDossier } from './entities';
+import { LessThan, Repository } from 'typeorm';
+import { Affiliate, AffiliateDocument, AffiliateFileDossier, DocumentImportPlan } from './entities';
 import { RpcException } from '@nestjs/microservices';
 import { DataSource } from 'typeorm';
 import { envsFtp } from 'src/config/envs';
+
+const DOCUMENT_IMPORT_PLAN_TTL_MS = 15 * 60 * 1000;
+
+interface DocumentImportActor {
+  username: string;
+  name?: string;
+}
+
+interface DocumentImportFile {
+  affiliate_id: string;
+  procedure_document_id: number;
+  shortened: string;
+  oldPath: string;
+  newPath: string;
+  personId: number;
+}
+
+interface DocumentImportAnalysis {
+  totalFolder: number;
+  readFolder: number;
+  nonNumericIds: string[];
+  validFolder: number;
+  dataErrorReadFolder: number[];
+  filesValidFolder: number;
+  filesValid: number;
+  dataErrorReadFiles: Record<string, string[]>;
+  dataValidRealExist: DocumentImportFile[];
+  dataValidRealNotExist: DocumentImportFile[];
+  duplicateData: Record<string, string[]>;
+}
 
 @Injectable()
 export class AffiliatesService {
@@ -18,6 +49,8 @@ export class AffiliatesService {
     private readonly affiliateDocumentsRepository: Repository<AffiliateDocument>,
     @InjectRepository(AffiliateFileDossier)
     private readonly affiliateFileDossierRepository: Repository<AffiliateFileDossier>,
+    @InjectRepository(DocumentImportPlan)
+    private readonly documentImportPlanRepository: Repository<DocumentImportPlan>,
     private readonly nats: NatsService,
     private readonly dataSource: DataSource,
   ) {}
@@ -295,7 +328,7 @@ export class AffiliatesService {
         status: false,
       };
 
-      if (number === 0) { 
+      if (number === 0) {
         additionallyDocuments.push(documentData);
       } else {
         if (!requiredDocuments.has(number)) {
@@ -312,272 +345,366 @@ export class AffiliatesService {
     };
   }
 
-  async documentsAnalysis(user: string, pass: string): Promise<any> {
+  async documentsAnalysis(actor: DocumentImportActor): Promise<any> {
+    const trustedActor = this.validateImportActor(actor);
     const path = envsFtp.ftpImportDocumentsPvtbe;
-    const key = await this.nats.firstValue('auth.login', { username: user, password: pass });
     const pathFtp = envsFtp.ftpDocuments;
-    if (!key.serviceStatus) {
-      throw new RpcException({ message: 'Credenciales incorrectas', code: 401 });
-    }
-
-    const initialFolder: {
-      totalFolder: number;
-      readFolder: number;
-      nonNumericIds: any;
-      validFolder: number;
-      dataErrorReadFolder: any;
-      filesValidFolder: number;
-      filesValid: number;
-      dataErrorReadFiles: any;
-      dataValidRealExist: any;
-      dataValidRealNotExist: any;
-      duplicateData: any;
-      user: any;
-    } = {
+    const analysis: DocumentImportAnalysis = {
       totalFolder: 0,
       readFolder: 0,
-      nonNumericIds: {},
+      nonNumericIds: [],
       validFolder: 0,
-      dataErrorReadFolder: {},
+      dataErrorReadFolder: [],
       filesValidFolder: 0,
       filesValid: 0,
       dataErrorReadFiles: {},
       dataValidRealExist: [],
-      dataValidRealNotExist: {},
+      dataValidRealNotExist: [],
       duplicateData: {},
-      user: key.user,
     };
-    const dataRead = {};
-    const dataValid = {};
-    const dataValidReal = [];
+    const dataRead: Record<string, string[]> = {};
+    const dataValid: Record<
+      string,
+      Record<string, { id: number; shortened: string; personId: number }>
+    > = {};
+    const dataValidReal: DocumentImportFile[] = [];
 
-    await this.nats.firstValue('ftp.connectSwitch', { value: 'true' });
-    const { data } = await this.nats.firstValue('ftp.listFiles', { path: path });
-    const { affiliateIds, nonNumericIds } = data.reduce(
-      (result, file) => {
-        const isOnlyNumbers = file.name.match(/^\d+$/);
-        if (isOnlyNumbers) {
-          result.affiliateIds.push(Number(file.name));
-        } else {
-          result.nonNumericIds.push(file.name);
-        }
-        return result;
-      },
-      { affiliateIds: [], nonNumericIds: [] },
-    );
-
-    if (affiliateIds.length === 0) {
-      throw new RpcException({ message: 'Ninguna Carpeta es Válida', code: 404 });
-    }
-
-    const validAffiliates = await this.dataSource.query(`
-      SELECT id FROM beneficiaries.affiliates WHERE id IN (${affiliateIds.join(',')})
-    `);
-    if (validAffiliates.length === 0) {
-      throw new RpcException({ message: 'Ninguna Carpeta es Válida', code: 404 });
-    }
-
-    initialFolder.totalFolder = affiliateIds.length + nonNumericIds.length;
-    initialFolder.readFolder = affiliateIds.length;
-    initialFolder.nonNumericIds = nonNumericIds;
-    initialFolder.validFolder = validAffiliates.length;
-    initialFolder.dataErrorReadFolder = affiliateIds.filter(
-      (item) => !new Set(validAffiliates.map((item) => Number(item.id))).has(item),
-    );
-
-    let notExistFiles = true;
-
-    for (const affiliateId of validAffiliates) {
-      const pathFile = `${path}/${affiliateId.id}`;
-
-      const { data } = await this.nats.firstValue('ftp.listFiles', { path: pathFile });
-      const files = data;
-      const documentsOriginal = files.map((file) => `'${file.name.replace(/"/g, '')}'`);
-      const documents = files.map(
-        (file) => `'${file.name.replace(/"/g, '').replace(/\.pdf$/i, '')}'`,
-      );
-      if (documents.length != 0) {
-        dataRead[affiliateId.id] = documentsOriginal;
-        initialFolder.filesValidFolder += documents.length;
-        const [validDocuments, dataPerson] = await Promise.all([
-          this.dataSource.query(
-            `SELECT id, shortened FROM public.procedure_documents WHERE shortened IN(${documents.join(',')})`,
-          ),
-          this.affiliateIdForPersonId(affiliateId.id),
-        ]);
-
-        if (validDocuments.length !== 0) {
-          notExistFiles = false;
-        }
-
-        initialFolder.filesValid += validDocuments.length;
-        dataValid[affiliateId.id] = {};
-        validDocuments.forEach((doc) => {
-          const shortened = doc.shortened;
-          doc.personId = dataPerson.personId;
-          dataValid[affiliateId.id][shortened] = doc;
+    await this.ensureFtpSuccess(await this.nats.firstValue('ftp.connectSwitch', { value: 'true' }));
+    try {
+      const rootListing = await this.nats.firstValue('ftp.listFiles', { path });
+      this.ensureFtpSuccess(rootListing);
+      if (!Array.isArray(rootListing.data)) {
+        throw new RpcException({
+          message: 'No se pudo analizar la carpeta de importacion',
+          code: 503,
         });
       }
-    }
 
-    if (notExistFiles) {
-      throw new RpcException({ message: 'No existen Archivos en las Carpetas', code: 404 });
-    }
-    await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
-    let totalThumbs: number = 0;
-    const shortenedMap: Record<string, boolean> = {};
+      const { affiliateIds, nonNumericIds } = rootListing.data.reduce(
+        (result: { affiliateIds: number[]; nonNumericIds: string[] }, file: unknown) => {
+          const name = this.ftpEntryName(file);
+          if (/^\d+$/.test(name)) result.affiliateIds.push(Number(name));
+          else result.nonNumericIds.push(name);
+          return result;
+        },
+        { affiliateIds: [], nonNumericIds: [] },
+      );
 
-    for (const affiliateId in dataRead) {
-      const validDocsMap = dataValid[affiliateId];
-      dataRead[affiliateId].forEach((doc) => {
-        const cleanedDoc = doc.replace(/^'|'$/g, '').replace(/\.[^.]+$/, '');
-        const validDoc = validDocsMap[cleanedDoc];
-        if (validDoc) {
-          const short = `${doc.replace(/^'|'$/g, '')}`;
-          const key = `${affiliateId}_${validDoc.id}`;
-          const personId = validDoc.personId;
+      if (affiliateIds.length === 0) {
+        throw new RpcException({ message: 'Ninguna Carpeta es Valida', code: 404 });
+      }
 
-          if (shortenedMap[key]) {
-            if (!initialFolder.duplicateData[affiliateId]) {
-              initialFolder.duplicateData[affiliateId] = [];
-            }
-            initialFolder.duplicateData[affiliateId].push(short);
-          } else {
-            shortenedMap[key] = true;
-            dataValidReal.push({
-              affiliate_id: affiliateId,
-              procedure_document_id: validDoc.id,
-              shortened: short,
-              oldPath: `${path}/${affiliateId}/${short}`,
-              newPath: `${pathFtp}/${affiliateId}/${short}`,
-              personId: personId,
-            });
-          }
-        } else {
-          if (
-            doc.replace(/^'|'$/g, '') !== 'Thumbs.db' &&
-            doc.replace(/^'|'$/g, '') !== 'desktop.ini'
-          ) {
-            if (!initialFolder.dataErrorReadFiles[affiliateId]) {
-              initialFolder.dataErrorReadFiles[affiliateId] = [];
-            }
-            initialFolder.dataErrorReadFiles[affiliateId].push(doc.replace(/^'|'$/g, ''));
-          } else {
-            totalThumbs++;
-          }
+      const validAffiliates: { id: number }[] = await this.dataSource.query(
+        'SELECT id FROM beneficiaries.affiliates WHERE id = ANY($1::int[])',
+        [affiliateIds],
+      );
+      if (validAffiliates.length === 0) {
+        throw new RpcException({ message: 'Ninguna Carpeta es Valida', code: 404 });
+      }
+
+      analysis.totalFolder = affiliateIds.length + nonNumericIds.length;
+      analysis.readFolder = affiliateIds.length;
+      analysis.nonNumericIds = nonNumericIds;
+      analysis.validFolder = validAffiliates.length;
+      const validAffiliateIds = new Set(validAffiliates.map(({ id }) => Number(id)));
+      analysis.dataErrorReadFolder = affiliateIds.filter((id) => !validAffiliateIds.has(id));
+
+      let hasValidFiles = false;
+      for (const { id: affiliateId } of validAffiliates) {
+        const listing = await this.nats.firstValue('ftp.listFiles', {
+          path: `${path}/${affiliateId}`,
+        });
+        this.ensureFtpSuccess(listing);
+        if (!Array.isArray(listing.data)) {
+          throw new RpcException({
+            message: 'No se pudo analizar la carpeta de importacion',
+            code: 503,
+          });
         }
+
+        const fileNames = listing.data.map((file: unknown) => this.ftpEntryName(file));
+        const shortenedNames = fileNames.map((name: string) => name.replace(/\.pdf$/i, ''));
+        if (shortenedNames.length === 0) continue;
+
+        dataRead[String(affiliateId)] = fileNames;
+        analysis.filesValidFolder += shortenedNames.length;
+        const [validDocuments, dataPerson] = await Promise.all([
+          this.dataSource.query(
+            'SELECT id, shortened FROM public.procedure_documents WHERE shortened = ANY($1::text[])',
+            [shortenedNames],
+          ),
+          this.affiliateIdForPersonId(affiliateId),
+        ]);
+
+        if (validDocuments.length > 0) hasValidFiles = true;
+        analysis.filesValid += validDocuments.length;
+        dataValid[String(affiliateId)] = {};
+        for (const document of validDocuments) {
+          dataValid[String(affiliateId)][document.shortened] = {
+            id: Number(document.id),
+            shortened: document.shortened,
+            personId: Number(dataPerson.personId),
+          };
+        }
+      }
+
+      if (!hasValidFiles) {
+        throw new RpcException({ message: 'No existen Archivos en las Carpetas', code: 404 });
+      }
+
+      let ignoredSystemFiles = 0;
+      const uniqueDocuments = new Set<string>();
+      for (const [affiliateId, fileNames] of Object.entries(dataRead)) {
+        const validDocuments = dataValid[affiliateId];
+        for (const fileName of fileNames) {
+          const shortened = fileName.replace(/\.[^.]+$/, '');
+          const validDocument = validDocuments[shortened];
+          if (!validDocument) {
+            if (fileName === 'Thumbs.db' || fileName === 'desktop.ini') {
+              ignoredSystemFiles++;
+            } else {
+              (analysis.dataErrorReadFiles[affiliateId] ??= []).push(fileName);
+            }
+            continue;
+          }
+
+          const documentKey = `${affiliateId}_${validDocument.id}`;
+          if (uniqueDocuments.has(documentKey)) {
+            (analysis.duplicateData[affiliateId] ??= []).push(fileName);
+            continue;
+          }
+          uniqueDocuments.add(documentKey);
+          dataValidReal.push({
+            affiliate_id: affiliateId,
+            procedure_document_id: validDocument.id,
+            shortened: fileName,
+            oldPath: `${path}/${affiliateId}/${fileName}`,
+            newPath: `${pathFtp}/${affiliateId}/${fileName}`,
+            personId: validDocument.personId,
+          });
+        }
+      }
+      analysis.filesValidFolder -= ignoredSystemFiles;
+
+      const existingDocuments: { affiliate_id: number; procedure_document_id: number }[] =
+        dataValidReal.length === 0
+          ? []
+          : await this.dataSource.query(
+              `SELECT affiliate_id, procedure_document_id
+               FROM beneficiaries.affiliate_documents
+               WHERE affiliate_id = ANY($1::int[])
+                 AND procedure_document_id = ANY($2::int[])`,
+              [
+                dataValidReal.map((document) => Number(document.affiliate_id)),
+                dataValidReal.map((document) => document.procedure_document_id),
+              ],
+            );
+      const existingSet = new Set(
+        existingDocuments.map(
+          ({ affiliate_id, procedure_document_id }) => `${affiliate_id}-${procedure_document_id}`,
+        ),
+      );
+      for (const document of dataValidReal) {
+        const target = existingSet.has(`${document.affiliate_id}-${document.procedure_document_id}`)
+          ? analysis.dataValidRealExist
+          : analysis.dataValidRealNotExist;
+        target.push(document);
+      }
+
+      const expiresAt = new Date(Date.now() + DOCUMENT_IMPORT_PLAN_TTL_MS);
+      await this.documentImportPlanRepository.delete({ expiresAt: LessThan(new Date()) });
+      const importPlan = this.documentImportPlanRepository.create({
+        id: randomUUID(),
+        ownerUsername: trustedActor.username,
+        plan: analysis as unknown as Record<string, unknown>,
+        expiresAt,
+        consumedAt: null,
       });
+      await this.documentImportPlanRepository.save(importPlan);
+
+      return {
+        ...analysis,
+        importId: importPlan.id,
+        expiresAt: expiresAt.toISOString(),
+      };
+    } finally {
+      await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
     }
-
-    initialFolder.filesValidFolder -= totalThumbs;
-
-    const values = dataValidReal
-      .map((doc) => `(${doc.affiliate_id}, ${doc.procedure_document_id})`)
-      .join(', ');
-
-    const dataExist = await this.dataSource.query(`
-      SELECT affiliate_id, procedure_document_id, path
-      FROM beneficiaries.affiliate_documents
-      WHERE (affiliate_id, procedure_document_id) IN (${values});
-    `);
-
-    const existingSet = new Set(
-      dataExist.map(
-        ({ affiliate_id, procedure_document_id }) => `${affiliate_id}-${procedure_document_id}`,
-      ),
-    );
-
-    const [dataNotExist, dataYesExist] = dataValidReal.reduce(
-      ([notExist, yesExist], doc) => {
-        const key = `${doc.affiliate_id}-${doc.procedure_document_id}`;
-        return existingSet.has(key)
-          ? [notExist, [...yesExist, doc]]
-          : [[...notExist, doc], yesExist];
-      },
-      [[], []] as [
-        { affiliate_id: string; procedure_document_id: string }[],
-        { affiliate_id: string; procedure_document_id: string }[],
-      ],
-    );
-
-    initialFolder.dataValidRealExist = dataYesExist;
-    initialFolder.dataValidRealNotExist = dataNotExist;
-
-    return initialFolder;
   }
 
-  async documentsImports(data: any): Promise<any> {
-    await this.nats.firstValue('ftp.connectSwitch', { value: 'true' });
-    const Archivos_validos_reales_Existentes = data.dataValidRealExist;
-    const Archivos_validos_reales_No_Existentes = data.dataValidRealNotExist;
-    let contNewFiles = 0;
-    let contExistFiles = 0;
+  async documentsImports(importId: string, actor: DocumentImportActor): Promise<any> {
+    if (!this.isUuid(importId)) {
+      throw new RpcException({ message: 'Plan de importacion no disponible', code: 404 });
+    }
+    const trustedActor = this.validateImportActor(actor);
+    await this.ensureFtpSuccess(await this.nats.firstValue('ftp.connectSwitch', { value: 'true' }));
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const plans = manager.getRepository(DocumentImportPlan);
+        const storedPlan = await plans.findOne({
+          where: { id: importId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (
+          !storedPlan ||
+          storedPlan.ownerUsername !== trustedActor.username ||
+          storedPlan.consumedAt !== null ||
+          storedPlan.expiresAt.getTime() <= Date.now()
+        ) {
+          throw new RpcException({ message: 'Plan de importacion no disponible', code: 404 });
+        }
 
-    await this.dataSource.transaction(async (transactionalEntityManager) => {
-      const insertsNew: string[] = [];
-      const insertsRecords: string[] = [];
-      try {
-        for (const file of Archivos_validos_reales_No_Existentes) {
-          await this.nats.firstValue('ftp.renameFile', {
-            oldPath: file.oldPath,
-            newPath: file.newPath,
+        const plan = this.validateStoredImportPlan(storedPlan.plan);
+        let newFiles = 0;
+        let updatedFiles = 0;
+        for (const file of plan.dataValidRealNotExist) {
+          this.ensureFtpSuccess(
+            await this.nats.firstValue('ftp.renameFile', {
+              oldPath: file.oldPath,
+              newPath: file.newPath,
+            }),
+          );
+          await manager.getRepository(AffiliateDocument).insert({
+            affiliateId: Number(file.affiliate_id),
+            procedureDocumentId: file.procedure_document_id,
+            path: file.newPath,
           });
-          insertsNew.push(
-            `(${file.affiliate_id}, ${file.procedure_document_id}, '${file.newPath}')`,
+          await this.insertDocumentImportRecord(manager, trustedActor, file, false);
+          newFiles++;
+        }
+
+        for (const file of plan.dataValidRealExist) {
+          this.ensureFtpSuccess(
+            await this.nats.firstValue('ftp.renameFile', {
+              oldPath: file.oldPath,
+              newPath: file.newPath,
+            }),
           );
-          insertsRecords.push(
-            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','Documento importado, ${file.shortened} registrado por ${data.user.name}.','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se creó el documento ${file.shortened} exitosamente."}',${file.personId})`,
+          await manager.getRepository(AffiliateDocument).update(
+            {
+              affiliateId: Number(file.affiliate_id),
+              procedureDocumentId: file.procedure_document_id,
+            },
+            { path: file.newPath },
           );
-          contNewFiles++;
+          await this.insertDocumentImportRecord(manager, trustedActor, file, true);
+          updatedFiles++;
         }
 
-        if (insertsNew.length > 0) {
-          const queryNew = `
-            INSERT INTO beneficiaries.affiliate_documents (affiliate_id, procedure_document_id, path)
-            VALUES ${insertsNew.join(',')}`;
-          await transactionalEntityManager.query(queryNew);
-        }
+        storedPlan.consumedAt = new Date();
+        await plans.save(storedPlan);
+        this.logger.log(`Archivos nuevos procesados: ${newFiles}`);
+        this.logger.log(`Archivos existentes actualizados: ${updatedFiles}`);
+        return {
+          totalFolder: plan.totalFolder,
+          newFiles,
+          updateFIles: updatedFiles,
+          totalFiles: newFiles + updatedFiles,
+          message: `Realizo la importacion de documentos, ${newFiles} nuevos archivos, ${updatedFiles} archivos actualizados.`,
+        };
+      });
+    } finally {
+      await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
+    }
+  }
 
-        for (const file of Archivos_validos_reales_Existentes) {
-          await this.nats.firstValue('ftp.renameFile', {
-            oldPath: file.oldPath,
-            newPath: file.newPath,
-          });
-
-          insertsRecords.push(
-            `('${JSON.stringify(data.user)}','POST: AffiliatesController.documentsImports','Documento importado, ${file.shortened} actualizado por ${data.user.name}.','{"params": {"affiliateId": "${file.affiliate_id}"}}','{"message": "Se actualizó el documento ${file.shortened} exitosamente."}',${file.personId})`,
-          );
-          const queryExist = `
-            UPDATE beneficiaries.affiliate_documents
-            SET updated_at = NOW(), path = '${file.newPath}'
-            WHERE affiliate_id = ${file.affiliate_id} AND procedure_document_id = ${file.procedure_document_id}`;
-          await transactionalEntityManager.query(queryExist);
-
-          contExistFiles++;
-        }
-
-        if (insertsRecords.length > 0) {
-          const queryRecords = `
-            INSERT INTO records.records_beneficiaries ("user", action, description, input, output, person_id)
-            VALUES ${insertsRecords.join(',')}`;
-          await transactionalEntityManager.query(queryRecords);
-        }
-      } catch (error) {
-        throw new RpcException({ message: 'Ya se realizo la importación', code: 404 });
-      }
-      this.logger.log(`Archivos nuevos procesados: ${contNewFiles}`);
-      this.logger.log(`Archivos existentes actualizados: ${contExistFiles}`);
-    });
-
-    await this.nats.firstValue('ftp.connectSwitch', { value: 'false' });
-
+  private validateImportActor(actor: DocumentImportActor): DocumentImportActor {
+    if (
+      !actor ||
+      typeof actor !== 'object' ||
+      typeof actor.username !== 'string' ||
+      actor.username.trim().length === 0 ||
+      (actor.name !== undefined && typeof actor.name !== 'string')
+    ) {
+      throw new RpcException({ message: 'Contexto de autorizacion invalido', code: 500 });
+    }
     return {
-      totalFolder: data.totalFolder,
-      newFiles: contNewFiles,
-      updateFIles: contExistFiles,
-      totalFiles: contNewFiles + contExistFiles,
-      message: `Realizó la importación de documentos, ${contNewFiles} nuevos archivos, ${contExistFiles} archivos actualizados.`,
+      username: actor.username,
+      ...(actor.name?.trim() ? { name: actor.name } : {}),
     };
+  }
+
+  private ftpEntryName(file: unknown): string {
+    if (
+      !file ||
+      typeof file !== 'object' ||
+      typeof (file as { name?: unknown }).name !== 'string' ||
+      (file as { name: string }).name.length === 0
+    ) {
+      throw new RpcException({ message: 'Respuesta FTP invalida', code: 503 });
+    }
+    return (file as { name: string }).name;
+  }
+
+  private ensureFtpSuccess(response: unknown): void {
+    if (
+      !response ||
+      typeof response !== 'object' ||
+      (response as { serviceStatus?: unknown }).serviceStatus !== true
+    ) {
+      throw new RpcException({ message: 'Servicio FTP no disponible', code: 503 });
+    }
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private validateStoredImportPlan(plan: Record<string, unknown>): DocumentImportAnalysis {
+    if (
+      !plan ||
+      typeof plan !== 'object' ||
+      !Array.isArray(plan.dataValidRealExist) ||
+      !Array.isArray(plan.dataValidRealNotExist) ||
+      typeof plan.totalFolder !== 'number'
+    ) {
+      throw new RpcException({ message: 'Plan de importacion invalido', code: 500 });
+    }
+    const files = [...plan.dataValidRealExist, ...plan.dataValidRealNotExist];
+    if (!files.every((file) => this.isStoredImportFile(file))) {
+      throw new RpcException({ message: 'Plan de importacion invalido', code: 500 });
+    }
+    return plan as unknown as DocumentImportAnalysis;
+  }
+
+  private isStoredImportFile(file: unknown): file is DocumentImportFile {
+    if (!file || typeof file !== 'object' || Array.isArray(file)) return false;
+    const value = file as Record<string, unknown>;
+    return (
+      typeof value.affiliate_id === 'string' &&
+      /^\d+$/.test(value.affiliate_id) &&
+      typeof value.procedure_document_id === 'number' &&
+      Number.isInteger(value.procedure_document_id) &&
+      typeof value.shortened === 'string' &&
+      typeof value.oldPath === 'string' &&
+      typeof value.newPath === 'string' &&
+      typeof value.personId === 'number' &&
+      Number.isInteger(value.personId)
+    );
+  }
+
+  private async insertDocumentImportRecord(
+    manager: import('typeorm').EntityManager,
+    actor: DocumentImportActor,
+    file: DocumentImportFile,
+    updated: boolean,
+  ): Promise<void> {
+    const actorName = actor.name ?? actor.username;
+    const operation = updated ? 'actualizado' : 'registrado';
+    const result = updated ? 'actualizo' : 'creo';
+    await manager.query(
+      `INSERT INTO records.records_beneficiaries
+       ("user", action, description, input, output, person_id)
+       VALUES ($1::jsonb, $2, $3, $4::jsonb, $5::jsonb, $6)`,
+      [
+        JSON.stringify(actor),
+        'POST: AffiliatesController.documentsImports',
+        `Documento importado, ${file.shortened} ${operation} por ${actorName}.`,
+        JSON.stringify({ params: { affiliateId: file.affiliate_id } }),
+        JSON.stringify({ message: `Se ${result} el documento ${file.shortened} exitosamente.` }),
+        file.personId,
+      ],
+    );
   }
 
   async showFileDossiers(affiliateId: number): Promise<any> {
