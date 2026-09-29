@@ -369,18 +369,12 @@ export class AffiliatesService {
     > = {};
     const dataValidReal: DocumentImportFile[] = [];
 
-    await this.ensureFtpSuccess(await this.nats.firstValue('ftp.connectSwitch', { value: 'true' }));
+    this.ensureFtpConnected(await this.nats.firstValue('ftp.connectSwitch', { value: 'true' }));
     try {
       const rootListing = await this.nats.firstValue('ftp.listFiles', { path });
-      this.ensureFtpSuccess(rootListing);
-      if (!Array.isArray(rootListing.data)) {
-        throw new RpcException({
-          message: 'No se pudo analizar la carpeta de importacion',
-          code: 503,
-        });
-      }
+      const rootFiles = this.ensureFtpListing(rootListing);
 
-      const { affiliateIds, nonNumericIds } = rootListing.data.reduce(
+      const { affiliateIds, nonNumericIds } = rootFiles.reduce(
         (result: { affiliateIds: number[]; nonNumericIds: string[] }, file: unknown) => {
           const name = this.ftpEntryName(file);
           if (/^\d+$/.test(name)) result.affiliateIds.push(Number(name));
@@ -414,15 +408,9 @@ export class AffiliatesService {
         const listing = await this.nats.firstValue('ftp.listFiles', {
           path: `${path}/${affiliateId}`,
         });
-        this.ensureFtpSuccess(listing);
-        if (!Array.isArray(listing.data)) {
-          throw new RpcException({
-            message: 'No se pudo analizar la carpeta de importacion',
-            code: 503,
-          });
-        }
+        const files = this.ensureFtpListing(listing);
 
-        const fileNames = listing.data.map((file: unknown) => this.ftpEntryName(file));
+        const fileNames = files.map((file: unknown) => this.ftpEntryName(file));
         const shortenedNames = fileNames.map((name: string) => name.replace(/\.pdf$/i, ''));
         if (shortenedNames.length === 0) continue;
 
@@ -537,7 +525,7 @@ export class AffiliatesService {
       throw new RpcException({ message: 'Plan de importacion no disponible', code: 404 });
     }
     const trustedActor = this.validateImportActor(actor);
-    await this.ensureFtpSuccess(await this.nats.firstValue('ftp.connectSwitch', { value: 'true' }));
+    this.ensureFtpConnected(await this.nats.firstValue('ftp.connectSwitch', { value: 'true' }));
     try {
       return await this.dataSource.transaction(async (manager) => {
         const plans = manager.getRepository(DocumentImportPlan);
@@ -558,7 +546,7 @@ export class AffiliatesService {
         let newFiles = 0;
         let updatedFiles = 0;
         for (const file of plan.dataValidRealNotExist) {
-          this.ensureFtpSuccess(
+          this.ensureFtpMoved(
             await this.nats.firstValue('ftp.renameFile', {
               oldPath: file.oldPath,
               newPath: file.newPath,
@@ -574,7 +562,7 @@ export class AffiliatesService {
         }
 
         for (const file of plan.dataValidRealExist) {
-          this.ensureFtpSuccess(
+          this.ensureFtpMoved(
             await this.nats.firstValue('ftp.renameFile', {
               oldPath: file.oldPath,
               newPath: file.newPath,
@@ -636,11 +624,31 @@ export class AffiliatesService {
     return (file as { name: string }).name;
   }
 
-  private ensureFtpSuccess(response: unknown): void {
+  private ensureFtpConnected(response: unknown): void {
     if (
       !response ||
       typeof response !== 'object' ||
-      (response as { serviceStatus?: unknown }).serviceStatus !== true
+      (response as { statusConnect?: unknown }).statusConnect !== true
+    ) {
+      throw new RpcException({ message: 'Servicio FTP no disponible', code: 503 });
+    }
+  }
+
+  private ensureFtpListing(response: unknown): unknown[] {
+    if (!Array.isArray(response)) {
+      throw new RpcException({
+        message: 'No se pudo analizar la carpeta de importacion',
+        code: 503,
+      });
+    }
+    return response;
+  }
+
+  private ensureFtpMoved(response: unknown): void {
+    if (
+      !response ||
+      typeof response !== 'object' ||
+      (response as { statusMoved?: unknown }).statusMoved !== true
     ) {
       throw new RpcException({ message: 'Servicio FTP no disponible', code: 503 });
     }

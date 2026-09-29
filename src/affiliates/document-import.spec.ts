@@ -81,17 +81,21 @@ describe('PVTBE document import plans', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    nats.firstValue.mockResolvedValue({ serviceStatus: true });
+    nats.firstValue.mockImplementation(async (pattern: string) => {
+      if (pattern === 'ftp.connectSwitch') return { statusConnect: true };
+      if (pattern === 'ftp.renameFile') return { statusMoved: true };
+      throw new Error(`Unexpected pattern ${pattern}`);
+    });
   });
 
   it('analyzes without auth.login and stores a server-side plan owned by the actor', async () => {
     nats.firstValue.mockImplementation(async (pattern: string, payload: { path?: string }) => {
-      if (pattern === 'ftp.connectSwitch') return { serviceStatus: true };
+      if (pattern === 'ftp.connectSwitch') return { statusConnect: true };
       if (pattern === 'ftp.listFiles' && payload.path === '/imports') {
-        return { serviceStatus: true, data: [{ name: '10' }] };
+        return [{ name: '10' }];
       }
       if (pattern === 'ftp.listFiles' && payload.path === '/imports/10') {
-        return { serviceStatus: true, data: [{ name: "CERT'O.pdf" }] };
+        return [{ name: "CERT'O.pdf" }];
       }
       throw new Error(`Unexpected pattern ${pattern}`);
     });
@@ -149,6 +153,44 @@ describe('PVTBE document import plans', () => {
       expect.objectContaining({ consumedAt: expect.any(Date) }),
     );
     expect(response).toMatchObject({ newFiles: 1, updateFIles: 0, totalFiles: 1 });
+  });
+
+  it.each([
+    ['connection', 'ftp.connectSwitch', undefined],
+    ['listing', 'ftp.listFiles', undefined],
+  ])(
+    'rejects an invalid FTP %s response without storing a plan',
+    async (_label, pattern, response) => {
+      nats.firstValue.mockImplementation(async (currentPattern: string) => {
+        if (currentPattern === pattern) return response;
+        if (currentPattern === 'ftp.connectSwitch') return { statusConnect: true };
+        throw new Error(`Unexpected pattern ${currentPattern}`);
+      });
+
+      await expect(service.documentsAnalysis(actor)).rejects.toBeInstanceOf(RpcException);
+
+      expect(planRepository.save).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects an invalid FTP move response before writing database changes', async () => {
+    planTransactionRepository.findOne.mockResolvedValue({
+      id: importId,
+      ownerUsername: actor.username,
+      plan,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    });
+    nats.firstValue.mockImplementation(async (pattern: string) => {
+      if (pattern === 'ftp.connectSwitch') return { statusConnect: true };
+      if (pattern === 'ftp.renameFile') return undefined;
+      throw new Error(`Unexpected pattern ${pattern}`);
+    });
+
+    await expect(service.documentsImports(importId, actor)).rejects.toBeInstanceOf(RpcException);
+
+    expect(affiliateDocumentTransactionRepository.insert).not.toHaveBeenCalled();
+    expect(planTransactionRepository.save).not.toHaveBeenCalled();
   });
 
   it.each([
