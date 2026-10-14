@@ -254,5 +254,4 @@ export class UpdateAffPublicToBeneficiaryTrigger1762287902247 implements Migrati
         `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {}
 }
