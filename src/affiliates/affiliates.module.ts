@@ -8,7 +8,6 @@ import {
   StateType,
   AffiliateState,
   AffiliateFileDossier,
-  DocumentImportPlan,
 } from './entities';
 
 @Module({
@@ -21,7 +20,6 @@ import {
       AffiliateState,
       StateType,
       AffiliateFileDossier,
-      DocumentImportPlan,
     ]),
   ],
 })

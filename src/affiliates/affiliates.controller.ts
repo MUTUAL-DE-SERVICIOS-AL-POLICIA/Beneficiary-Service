@@ -58,19 +58,14 @@ export class AffiliatesController {
   }
 
   @MessagePattern('affiliate.documentsAnalysis')
-  documentsAnalysis(@Payload() payload: { actor: { username: string; name?: string } }) {
-    return this.affiliatesService.documentsAnalysis(payload.actor);
+  documentsAnalysis(@Payload() payload: { path: string; user: string; pass: string }) {
+    const { user, pass } = payload;
+    return this.affiliatesService.documentsAnalysis(user, pass);
   }
 
   @MessagePattern('affiliate.documentsImports')
-  documentsImports(
-    @Payload()
-    payload: {
-      importId: string;
-      actor: { username: string; name?: string };
-    },
-  ) {
-    return this.affiliatesService.documentsImports(payload.importId, payload.actor);
+  documentsImports(@Payload() payload: object) {
+    return this.affiliatesService.documentsImports(payload);
   }
 
   @MessagePattern('affiliate.createFileDossier')
