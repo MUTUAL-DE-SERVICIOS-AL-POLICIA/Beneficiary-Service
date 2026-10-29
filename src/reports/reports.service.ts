@@ -8,16 +8,27 @@ export class ReportsService {
     private readonly dataSource: DataSource
   ) {}
 
-  async reportRegisterFingerPrints(filters: ReportsDto = {}): Promise<any> {
+  async reportRegisterFingerPrints(
+    filters: ReportsDto = {},
+  ): Promise<any> {
     try {
-
       const params: any[] = [];
 
       const dateFrom = filters.dateFrom;
       const dateTo = filters.dateTo;
+      const allRecords = filters.allRecords;
 
-      params.push(dateFrom);
-      params.push(dateTo);
+      let dateFilter = '';
+
+      if (!allRecords) {
+        params.push(dateFrom);
+        params.push(dateTo);
+
+        dateFilter = `
+          WHERE pf.created_at >= $1::date
+            AND pf.created_at < ($2::date + INTERVAL '1 day')
+        `;
+      }
 
       const reportData = await this.dataSource.query(
         `
@@ -25,7 +36,9 @@ export class ReportsService {
             ROW_NUMBER() OVER (
               ORDER BY MIN(pf.created_at) DESC
             ) AS "N°",
+
             pa_nup.type_id AS "NUP",
+
             p.identity_card AS "CI Beneficiario",
 
             CONCAT_WS(
@@ -59,8 +72,7 @@ export class ReportsService {
             ON pa_nup.person_id = p.id
             AND pa_nup.type = 'affiliates'
 
-          WHERE pf.created_at >= $1::date
-            AND pf.created_at < ($2::date + INTERVAL '1 day')
+          ${dateFilter}
 
           GROUP BY
             p.id,
@@ -82,7 +94,11 @@ export class ReportsService {
 
       const header = {
         title: 'REPORTE DE BENEFICIARIOS CON HUELLAS DIGITALES REGISTRADAS',
-        subtitle: `Desde: ${dateFrom} Hasta: ${dateTo}`,
+
+        subtitle: allRecords
+          ? 'Todos los registros'
+          : `Desde: ${dateFrom} Hasta: ${dateTo}`,
+
         date: now.toLocaleDateString('es-BO', {
           timeZone: 'America/La_Paz',
           day: '2-digit',
@@ -97,21 +113,22 @@ export class ReportsService {
           second: '2-digit',
           hour12: false,
         }),
+
         user: filters.user,
       };
 
       return {
         error: false,
-        message: 'Datos para el reporte de ventas generado correctamente',
+        message: 'Datos para el reporte de beneficiarios generado correctamente',
         data: {
           header,
-          reportData
+          reportData,
         },
-      }
+      };
     } catch {
       return {
         error: true,
-        message: 'Error al obtener datos para el reporte de ventas',
+        message: 'Error al obtener datos para el reporte de beneficiarios',
         data: [],
       };
     }
