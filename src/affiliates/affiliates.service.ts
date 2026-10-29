@@ -295,7 +295,7 @@ export class AffiliatesService {
         status: false,
       };
 
-      if (number === 0) { 
+      if (number === 0) {
         additionallyDocuments.push(documentData);
       } else {
         if (!requiredDocuments.has(number)) {
@@ -314,7 +314,10 @@ export class AffiliatesService {
 
   async documentsAnalysis(user: string, pass: string): Promise<any> {
     const path = envsFtp.ftpImportDocumentsPvtbe;
-    const key = await this.nats.firstValue('auth.login', { username: user, password: pass });
+    const key = await this.nats.firstValue('auth.pvt-import.credentials.validate', {
+      username: user,
+      password: pass,
+    });
     const pathFtp = envsFtp.ftpDocuments;
     if (!key.serviceStatus) {
       throw new RpcException({ message: 'Credenciales incorrectas', code: 401 });
