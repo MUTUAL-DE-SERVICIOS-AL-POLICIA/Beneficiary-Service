@@ -96,4 +96,26 @@ export class PersonsController {
   async search(@Payload('value') value: string, @Payload('type') type: string) {
     return this.personsService.search(value, type);
   }
+
+  @MessagePattern('person.createPhoto')
+  async createPhoto(data: { personId: number; identityCard: string }) {
+    return this.personsService.createPhoto(data.personId, data.identityCard);
+  }
+
+  @MessagePattern('person.updatePhoto')
+  async updatePhoto(data: { personId: number; identityCard: string }) {
+    return this.personsService.updatePhoto(data.personId, data.identityCard);
+  }
+
+  @MessagePattern('person.deletePhoto')
+  async deletePhoto(data: { personId: number }) {
+    return this.personsService.deletePhoto(data.personId);
+  }
+
+  @MessagePattern('person.findPhoto')
+  async findPhoto(
+    @Payload('personId', ParseIntPipe) personId: number,
+  ) {
+    return this.personsService.findPhoto(personId);
+  }
 }
