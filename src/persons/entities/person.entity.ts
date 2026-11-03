@@ -8,7 +8,9 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  OneToOne,
 } from 'typeorm';
+import { PersonPhoto } from './person-photo.entity';
 
 @Entity({ schema: 'beneficiaries', name: 'persons' })
 export class Person {
@@ -147,6 +149,9 @@ export class Person {
   @OneToMany(() => PersonFingerprint, (personFingerprint) => personFingerprint.person)
   personFingerprints: PersonFingerprint[];
 
+  @OneToOne(() => PersonPhoto, (personPhoto) => personPhoto.person)
+  personPhoto: PersonPhoto[];
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
@@ -156,3 +161,4 @@ export class Person {
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
 }
+
