@@ -7,7 +7,7 @@ import { NatsService } from 'src/common';
 import { envsFtp } from 'src/config/envs';
 import { Repository } from 'typeorm';
 import { FilteredPaginationDto } from './dto/filter-person.dto';
-import { FingerprintType, Person, PersonAffiliate, PersonFingerprint } from './entities';
+import { FingerprintType, Person, PersonAffiliate, PersonFingerprint, PersonPhoto } from './entities';
 
 @Injectable()
 export class PersonsService {
@@ -22,6 +22,8 @@ export class PersonsService {
     private readonly fingerprintTypeRepository: Repository<FingerprintType>,
     @InjectRepository(PersonAffiliate)
     private readonly personAffiliateRepository: Repository<PersonAffiliate>,
+    @InjectRepository(PersonPhoto)
+    private readonly personPhotoRepository: Repository<PersonPhoto>,
     private readonly nats: NatsService,
   ) {}
 
@@ -242,6 +244,7 @@ export class PersonsService {
       .leftJoinAndSelect('person.personAffiliates', 'personAffiliates')
       .leftJoinAndSelect('person.personFingerprints', 'personFingerprints')
       .leftJoinAndSelect('personFingerprints.fingerprintType', 'fingerprintType')
+      .leftJoinAndSelect('person.personPhoto', 'personPhoto')
       .where(`person.${field} = :value`, { value })
       .getOne();
     if (!person) {
@@ -677,5 +680,86 @@ export class PersonsService {
         message: 'No se encontraron coincidencias',
       };
     }
+  }
+
+  async createPhoto(personId: number, identityCard: string): Promise<any> {
+
+    const photo = await this.personPhotoRepository.findOne({where: {personId}})
+
+    const initialPath = `${envsFtp.ftpPhotos}/`;
+
+    if (photo) {
+      return {
+        error: true,
+        message: 'Intento de creación de una foto ya existente',
+      };
+    }
+
+    const personPhoto = new PersonPhoto();
+    personPhoto.personId = personId;
+    personPhoto.path = `${initialPath}${identityCard}.jpg`;
+    await this.personPhotoRepository.save(personPhoto);
+
+    return {
+      error: false,
+      message: `Foto registrada correctamente`,
+      personPhotos: [
+        {
+          fileId: identityCard,
+          path: personPhoto.path,
+        },
+      ],
+    };
+  }
+
+  async updatePhoto(personId: number, identityCard: string): Promise<any> {
+
+    const photo = await this.personPhotoRepository.findOne({where: {personId}})
+
+    photo.updatedAt = new Date();
+    await this.personPhotoRepository.save(photo);
+
+    return {
+      error: false,
+      message: `Foto actualizada correctamente`,
+      personPhotos: [
+        {
+          fileId: identityCard,
+          path: photo.path,
+        },
+      ],
+    };
+  }
+
+  async deletePhoto(personId: number): Promise<any> {
+
+    const photo = await this.personPhotoRepository.findOne({where: {personId}})
+
+    if (!photo) {
+      return {
+        error: true,
+        message: 'Intento de eliminación de una foto no existente',
+      };
+    }
+
+    await this.personPhotoRepository.remove(photo);
+
+    return {
+      error: false,
+      message: `Foto eliminada correctamente`,
+      paths: [photo.path],
+    };
+  }
+
+  async findPhoto(
+    personId: number,
+  ): Promise<PersonPhoto[]> {
+    const personPhotos = await this.personPhotoRepository.find({ where: { personId } });
+
+    if (personPhotos.length === 0){
+      throw new RpcException({ message: 'Photo not found', code: 404 });
+    }
+
+    return personPhotos;
   }
 }

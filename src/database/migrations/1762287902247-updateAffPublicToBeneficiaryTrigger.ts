@@ -254,4 +254,8 @@ export class UpdateAffPublicToBeneficiaryTrigger1762287902247 implements Migrati
         `);
   }
 
+	public async down(queryRunner: QueryRunner): Promise<void> {
+		await queryRunner.query(`DROP FUNCTION beneficiaries.replicate_affiliates_to_persons_and_persons_aff()`);
+	}
+
 }
