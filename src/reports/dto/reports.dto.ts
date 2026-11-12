@@ -11,5 +11,9 @@ export class ReportsDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  allRecords?: string;
+
+  @IsOptional()
+  @IsString()
   user?: string;
 }

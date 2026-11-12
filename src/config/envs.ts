@@ -14,6 +14,7 @@ interface EnvVars {
   PATH_FTP_DOCUMENTS: string;
   PATH_FTP_FILE_DOSSIERS: string;
   PATH_FTP_IMPORT_DOCUMENTS_PVTBE: string;
+  PATH_FTP_PHOTOS: string;
 }
 
 const envsSchema = joi
@@ -64,4 +65,5 @@ export const envsFtp = {
   ftpDocuments: envVars.PATH_FTP_DOCUMENTS,
   ftpFileDossiers: envVars.PATH_FTP_FILE_DOSSIERS,
   ftpImportDocumentsPvtbe: envVars.PATH_FTP_IMPORT_DOCUMENTS_PVTBE,
+  ftpPhotos: envVars.PATH_FTP_PHOTOS
 };

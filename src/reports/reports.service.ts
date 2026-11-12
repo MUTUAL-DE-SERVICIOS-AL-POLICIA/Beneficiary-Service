@@ -8,16 +8,27 @@ export class ReportsService {
     private readonly dataSource: DataSource
   ) {}
 
-  async reportRegisterFingerPrints(filters: ReportsDto = {}): Promise<any> {
+  async reportRegisterFingerPrints(
+    filters: ReportsDto = {},
+  ): Promise<any> {
     try {
-
       const params: any[] = [];
 
       const dateFrom = filters.dateFrom;
       const dateTo = filters.dateTo;
+      const allRecords = filters.allRecords;
 
-      params.push(dateFrom);
-      params.push(dateTo);
+      let dateFilter = '';
+
+      if (allRecords === 'false') {
+        params.push(dateFrom);
+        params.push(dateTo);
+
+        dateFilter = `
+          WHERE pf.created_at >= $1::date
+            AND pf.created_at < ($2::date + INTERVAL '1 day')
+        `;
+      }
 
       const reportData = await this.dataSource.query(
         `
@@ -25,7 +36,9 @@ export class ReportsService {
             ROW_NUMBER() OVER (
               ORDER BY MIN(pf.created_at) DESC
             ) AS "N°",
+
             pa_nup.type_id AS "NUP",
+
             p.identity_card AS "CI Beneficiario",
 
             CONCAT_WS(
@@ -59,8 +72,7 @@ export class ReportsService {
             ON pa_nup.person_id = p.id
             AND pa_nup.type = 'affiliates'
 
-          WHERE pf.created_at >= $1::date
-            AND pf.created_at < ($2::date + INTERVAL '1 day')
+          ${dateFilter}
 
           GROUP BY
             p.id,
@@ -82,7 +94,11 @@ export class ReportsService {
 
       const header = {
         title: 'REPORTE DE BENEFICIARIOS CON HUELLAS DIGITALES REGISTRADAS',
-        subtitle: `Desde: ${dateFrom} Hasta: ${dateTo}`,
+
+        subtitle: allRecords
+          ? 'Todos los registros'
+          : `Desde: ${dateFrom} Hasta: ${dateTo}`,
+
         date: now.toLocaleDateString('es-BO', {
           timeZone: 'America/La_Paz',
           day: '2-digit',
@@ -97,21 +113,138 @@ export class ReportsService {
           second: '2-digit',
           hour12: false,
         }),
+
         user: filters.user,
       };
 
       return {
         error: false,
-        message: 'Datos para el reporte de ventas generado correctamente',
+        message: 'Datos para el reporte de beneficiarios generado correctamente',
         data: {
           header,
-          reportData
+          reportData,
         },
-      }
+      };
     } catch {
       return {
         error: true,
-        message: 'Error al obtener datos para el reporte de ventas',
+        message: 'Error al obtener datos para el reporte de beneficiarios',
+        data: [],
+      };
+    }
+  }
+
+    async reportPhotos(
+    filters: ReportsDto = {},
+  ): Promise<any> {
+    try {
+      console.log(filters);
+      const params: any[] = [];
+
+      const dateFrom = filters.dateFrom;
+      const dateTo = filters.dateTo;
+      const allRecords = filters.allRecords;
+
+      let dateFilter = '';
+
+      if (allRecords === 'false') {
+        params.push(dateFrom);
+        params.push(dateTo);
+
+        dateFilter = `
+          WHERE pp.created_at >= $1::date
+            AND pp.created_at < ($2::date + INTERVAL '1 day')
+        `;
+      }
+
+        const reportData = await this.dataSource.query(
+        `
+          SELECT
+            ROW_NUMBER() OVER (
+              ORDER BY pp.created_at DESC
+            ) AS "N°",
+
+            pa_nup.type_id AS "NUP",
+
+            p.identity_card AS "CI Beneficiario",
+
+            CONCAT_WS(
+              ' ',
+              NULLIF(p.first_name, ''),
+              NULLIF(p.second_name, ''),
+              NULLIF(p.last_name, ''),
+              NULLIF(p.mothers_last_name, '')
+            ) AS "Nombre Completo",
+
+            p_afiliado.identity_card AS "CI Afiliado",
+
+            k.name AS "Parentesco con el afiliado"
+
+          FROM beneficiaries."persons" p
+
+          INNER JOIN beneficiaries."person_photos" pp
+            ON pp.person_id = p.id
+
+          LEFT JOIN beneficiaries."person_affiliates" pa
+            ON pa.person_id = p.id
+            AND pa.type = 'persons'
+
+          LEFT JOIN beneficiaries."persons" p_afiliado
+            ON p_afiliado.id = pa.type_id
+
+          LEFT JOIN public.kinships k
+            ON k.id = pa.kinship_type
+
+          LEFT JOIN beneficiaries."person_affiliates" pa_nup
+            ON pa_nup.person_id = p.id
+            AND pa_nup.type = 'affiliates'
+
+          ${dateFilter}
+
+          ORDER BY pp.created_at DESC
+        `,
+        params,
+      );
+
+      const now = new Date();
+
+      const header = {
+        title: 'REPORTE DE BENEFICIARIOS CON FOTO REGISTRADA',
+
+        subtitle: allRecords
+          ? 'Todos los registros'
+          : `Desde: ${dateFrom} Hasta: ${dateTo}`,
+
+        date: now.toLocaleDateString('es-BO', {
+          timeZone: 'America/La_Paz',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+
+        hour: now.toLocaleTimeString('es-BO', {
+          timeZone: 'America/La_Paz',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }),
+
+        user: filters.user,
+      };
+
+      return {
+        error: false,
+        message: 'Datos para el reporte de beneficiarios generado correctamente',
+        data: {
+          header,
+          reportData,
+        },
+      };
+    } catch {
+      return {
+        error: true,
+        message: 'Error al obtener datos para el reporte de beneficiarios',
         data: [],
       };
     }
